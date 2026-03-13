@@ -1,6 +1,6 @@
 {
   "name": "opencroc",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "AI-native E2E testing framework — source-aware test generation, intelligent validation, and self-healing",
   "keywords": [
     "e2e",
@@ -17,7 +17,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/opencroc/opencroc.git"
+    "url": "git+https://github.com/opencroc/opencroc.git"
   },
   "license": "MIT",
   "author": "OpenCroc Contributors",
@@ -25,7 +25,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "opencroc": "./dist/cli/index.js"
+    "opencroc": "dist/cli/index.js"
   },
   "files": [
     "dist",
