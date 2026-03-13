@@ -76,5 +76,14 @@ export { generateCiTemplate, listCiPlatforms, generateGitHubActionsTemplate, gen
 export type { ReportOutput } from './reporters/index.js';
 export { generateReports, generateHtmlReport, generateJsonReport, generateMarkdownReport } from './reporters/index.js';
 
+// --- Visual Dashboard ---
+export type { DashboardData, DashboardOutput } from './dashboard/index.js';
+export {
+  buildDashboardDataFromPipeline,
+  buildDashboardDataFromReportJson,
+  generateVisualDashboardHtml,
+  generateVisualDashboard,
+} from './dashboard/index.js';
+
 // --- VSCode Extension Scaffold ---
 export { COMMANDS as VSCODE_COMMANDS, generateExtensionManifest, generateExtensionEntrypoint, buildModuleTree, buildStatusTree } from './vscode/index.js';

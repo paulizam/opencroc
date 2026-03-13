@@ -294,7 +294,7 @@ export default defineConfig({
 - [x] Plugin system
 - [x] HTML / JSON / Markdown report generation
 - [x] NestJS controller parser
-- [ ] Visual dashboard (opencroc.com)
+- [x] Visual dashboard (opencroc.com)
 - [x] Drizzle ORM adapter
 
 ## 文档

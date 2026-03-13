@@ -7,7 +7,7 @@ const program = new Command();
 program
   .name('opencroc')
   .description('AI-native E2E testing framework')
-  .version('0.5.0');
+  .version('0.6.0');
 
 program
   .command('init')
@@ -78,6 +78,16 @@ program
   .action(async (opts) => {
     const { report } = await import('./commands/report.js');
     await report(opts);
+  });
+
+program
+  .command('dashboard')
+  .description('Generate visual dashboard (opencroc-dashboard.html)')
+  .option('-i, --input <file>', 'Build from existing opencroc-report.json file')
+  .option('-o, --output <dir>', 'Output directory', './opencroc-output')
+  .action(async (opts) => {
+    const { dashboard } = await import('./commands/dashboard.js');
+    await dashboard(opts);
   });
 
 program.parse();

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-13
+
+### Added
+- **Visual dashboard module** (`src/dashboard/`) with bold responsive HTML dashboard generation
+  - `buildDashboardDataFromPipeline()` to aggregate module/table/chain/issue metrics
+  - `buildDashboardDataFromReportJson()` to render dashboard directly from `opencroc-report.json`
+  - `generateVisualDashboardHtml()` and `generateVisualDashboard()` (output: `opencroc-dashboard.html`)
+- **New CLI command**: `opencroc dashboard`
+  - Runs pipeline and generates visual dashboard, or
+  - Renders from `--input <opencroc-report.json>` without re-running pipeline
+- New tests: `src/dashboard/dashboard.test.ts` and `src/cli/commands/dashboard.test.ts`
+
+### Changed
+- Public API exports now include dashboard module functions and types
+- CLI version bumped to `0.6.0`
+- Roadmap updated in all README variants (EN/ZH/JA): `Visual dashboard (opencroc.com)` marked completed
+
 ## [0.5.0] - 2026-03-13
 
 ### Added
@@ -247,7 +264,8 @@ See individual pre-release entries below for detailed changelogs.
 - GitHub Actions CI (`ci.yml`) with Node 20.x/22.x matrix
 - GitHub Actions release (`release.yml`) with tag-triggered npm publish
 
-[Unreleased]: https://github.com/opencroc/opencroc/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/opencroc/opencroc/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/opencroc/opencroc/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/opencroc/opencroc/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/opencroc/opencroc/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/opencroc/opencroc/compare/v0.3.0...v0.3.1

@@ -76,6 +76,13 @@ describe('public API exports', () => {
     expect(typeof api.generateMarkdownReport).toBe('function');
   });
 
+  it('exports visual dashboard module', () => {
+    expect(typeof api.buildDashboardDataFromPipeline).toBe('function');
+    expect(typeof api.buildDashboardDataFromReportJson).toBe('function');
+    expect(typeof api.generateVisualDashboardHtml).toBe('function');
+    expect(typeof api.generateVisualDashboard).toBe('function');
+  });
+
   it('exports VSCode extension scaffold', () => {
     expect(typeof api.generateExtensionManifest).toBe('function');
     expect(typeof api.generateExtensionEntrypoint).toBe('function');
