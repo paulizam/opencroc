@@ -51,6 +51,12 @@ describe('public API exports', () => {
     expect(typeof api.categorizeFailure).toBe('function');
   });
 
+  it('exports Drizzle adapter', () => {
+    expect(typeof api.createDrizzleAdapter).toBe('function');
+    expect(typeof api.parseDrizzleFile).toBe('function');
+    expect(typeof api.parseDrizzleDirectory).toBe('function');
+  });
+
   it('exports plugin system', () => {
     expect(typeof api.createPluginRegistry).toBe('function');
     expect(typeof api.definePlugin).toBe('function');

@@ -10,6 +10,11 @@ import {
   createPrismaAdapter,
 } from './prisma.js';
 import { createAdapter, detectAdapter, resolveAdapter } from './registry.js';
+import {
+  parseDrizzleFile,
+  parseDrizzleDirectory,
+  createDrizzleAdapter,
+} from './drizzle.js';
 
 const FIXTURES = join(__dirname, '__fixtures__');
 
@@ -126,12 +131,84 @@ describe('createPrismaAdapter', () => {
   });
 });
 
+// ===== Drizzle Adapter =====
+describe('Drizzle parser', () => {
+  const fixtureFile = join(FIXTURES, 'drizzle-schema.ts');
+
+  it('parses 3 pgTable definitions from fixture', () => {
+    const { schemas } = parseDrizzleFile(fixtureFile);
+    expect(schemas).toHaveLength(3);
+    expect(schemas.map((s) => s.tableName).sort()).toEqual(['posts', 'tags', 'users']);
+  });
+
+  it('extracts primary key field correctly', () => {
+    const { schemas } = parseDrizzleFile(fixtureFile);
+    const users = schemas.find((s) => s.tableName === 'users');
+    expect(users).toBeDefined();
+    const id = users!.fields.find((f) => f.name === 'id');
+    expect(id?.primaryKey).toBe(true);
+    expect(id?.type).toBe('INTEGER');
+  });
+
+  it('marks unique fields', () => {
+    const { schemas } = parseDrizzleFile(fixtureFile);
+    const users = schemas.find((s) => s.tableName === 'users');
+    const email = users!.fields.find((f) => f.name === 'email');
+    expect(email?.unique).toBe(true);
+  });
+
+  it('marks notNull fields as non-nullable', () => {
+    const { schemas } = parseDrizzleFile(fixtureFile);
+    const posts = schemas.find((s) => s.tableName === 'posts');
+    const title = posts!.fields.find((f) => f.name === 'title');
+    expect(title?.allowNull).toBe(false);
+    const content = posts!.fields.find((f) => f.name === 'content');
+    expect(content?.allowNull).toBe(true);
+  });
+
+  it('extracts FK relation from .references()', () => {
+    const { relations } = parseDrizzleFile(fixtureFile);
+    const fk = relations.find(
+      (r) => r.sourceTable === 'posts' && r.targetTable === 'users',
+    );
+    expect(fk).toBeDefined();
+    expect(fk!.sourceField).toBe('author_id');
+    expect(fk!.targetField).toBe('id');
+    expect(fk!.cardinality).toBe('N:1');
+  });
+
+  it('returns empty for non-existent file', () => {
+    const result = parseDrizzleFile('/nonexistent/schema.ts');
+    expect(result.schemas).toEqual([]);
+    expect(result.relations).toEqual([]);
+  });
+
+  it('parseDrizzleDirectory returns empty for nonexistent dir', () => {
+    const result = parseDrizzleDirectory('/nonexistent');
+    expect(result.schemas).toEqual([]);
+  });
+});
+
+describe('createDrizzleAdapter', () => {
+  it('creates adapter with name "drizzle"', () => {
+    const adapter = createDrizzleAdapter();
+    expect(adapter.name).toBe('drizzle');
+  });
+
+  it('parseModels returns empty for non-existent dir', async () => {
+    const adapter = createDrizzleAdapter();
+    const result = await adapter.parseModels('/nonexistent');
+    expect(result).toEqual([]);
+  });
+});
+
 // ===== Registry =====
 describe('adapter registry', () => {
   it('createAdapter returns correct adapter by name', () => {
     expect(createAdapter('sequelize').name).toBe('sequelize');
     expect(createAdapter('typeorm').name).toBe('typeorm');
     expect(createAdapter('prisma').name).toBe('prisma');
+    expect(createAdapter('drizzle').name).toBe('drizzle');
   });
 
   it('createAdapter throws for unknown name', () => {

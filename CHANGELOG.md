@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-13
+
+### Added
+- **Drizzle ORM adapter** (`src/adapters/drizzle.ts`)
+  - Parses `pgTable` / `mysqlTable` / `sqliteTable` schema files via ts-morph AST
+  - Extracts table names, column names, field types, `primaryKey`, `notNull`, `unique`, `default`
+  - Extracts FK relations from inline `.references(() => targetTable.col)` calls
+  - `parseDrizzleFile(filePath)` — single file; `parseDrizzleDirectory(dirPath)` — scans dir
+  - `createDrizzleAdapter()` — `BackendAdapter` compatible with existing pipeline
+- Drizzle fixture at `src/adapters/__fixtures__/drizzle-schema.ts` (pgTable, 3 tables)
+- 9 new unit tests (schema parsing, FK relations, edge cases, adapter interface)
+- Auto-detection in `detectAdapter()` now recognises `pgTable|mysqlTable|sqliteTable` patterns
+- Public API exports: `createDrizzleAdapter`, `parseDrizzleFile`, `parseDrizzleDirectory`
+
+### Changed
+- CLI version bumped to `0.5.0`
+- Roadmap updated in all README variants — Drizzle ORM adapter marked as completed
+
 ## [0.4.0] - 2026-03-13
 
 ### Added
@@ -229,7 +247,8 @@ See individual pre-release entries below for detailed changelogs.
 - GitHub Actions CI (`ci.yml`) with Node 20.x/22.x matrix
 - GitHub Actions release (`release.yml`) with tag-triggered npm publish
 
-[Unreleased]: https://github.com/opencroc/opencroc/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/opencroc/opencroc/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/opencroc/opencroc/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/opencroc/opencroc/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/opencroc/opencroc/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/opencroc/opencroc/compare/v0.2.0...v0.3.0

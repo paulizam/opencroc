@@ -62,6 +62,7 @@ export type { BackendAdapter, LlmProvider } from './adapters/types.js';
 export { createSequelizeAdapter } from './adapters/sequelize.js';
 export { createTypeORMAdapter } from './adapters/typeorm.js';
 export { createPrismaAdapter } from './adapters/prisma.js';
+export { createDrizzleAdapter, parseDrizzleFile, parseDrizzleDirectory } from './adapters/drizzle.js';
 export { createAdapter, detectAdapter, resolveAdapter } from './adapters/registry.js';
 
 // --- Plugins ---

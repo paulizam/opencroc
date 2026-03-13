@@ -260,7 +260,7 @@ export default defineConfig({
 
 | 层级 | 已支持 | 规划中 |
 |---|---|---|
-| **ORM** | Sequelize, TypeORM, Prisma | Drizzle |
+| **ORM** | Sequelize, TypeORM, Prisma, Drizzle | — |
 | **Framework** | Express | NestJS, Fastify, Koa |
 | **Test Runner** | Playwright | — |
 | **LLM** | OpenAI, ZhiPu (GLM), Ollama (local) | Anthropic |
@@ -295,7 +295,7 @@ export default defineConfig({
 - [x] HTML / JSON / Markdown report generation
 - [x] NestJS controller parser
 - [ ] Visual dashboard (opencroc.com)
-- [ ] Drizzle ORM adapter
+- [x] Drizzle ORM adapter
 
 ## 文档
 

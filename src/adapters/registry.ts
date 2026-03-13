@@ -4,11 +4,13 @@ import type { BackendAdapter } from '../types.js';
 import { createSequelizeAdapter } from './sequelize.js';
 import { createTypeORMAdapter } from './typeorm.js';
 import { createPrismaAdapter } from './prisma.js';
+import { createDrizzleAdapter } from './drizzle.js';
 
 const ADAPTER_FACTORIES: Record<string, () => BackendAdapter> = {
   sequelize: createSequelizeAdapter,
   typeorm: createTypeORMAdapter,
   prisma: createPrismaAdapter,
+  drizzle: createDrizzleAdapter,
 };
 
 /**
@@ -43,7 +45,7 @@ export function detectAdapter(backendRoot: string): string {
     if (fs.existsSync(loc)) return 'prisma';
   }
 
-  // Check for TypeORM — scan models directory for @Entity
+  // Check for TypeORM / Drizzle — scan models directory
   const modelsDir = path.join(root, 'models');
   if (fs.existsSync(modelsDir)) {
     try {
@@ -54,6 +56,7 @@ export function detectAdapter(backendRoot: string): string {
         try {
           const content = fs.readFileSync(filePath, 'utf-8');
           if (/@Entity\s*\(/.test(content)) return 'typeorm';
+          if (/(?:pgTable|mysqlTable|sqliteTable)\s*\(/.test(content)) return 'drizzle';
         } catch {
           // skip
         }
