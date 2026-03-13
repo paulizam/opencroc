@@ -15,28 +15,28 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.ja.md">日本語</a>
+  <a href="README.en.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.ja.md">日本語</a>
 </p>
 
 ---
 
 ## What is OpenCroc?
 
-OpenCroc is an **AI-native end-to-end testing framework** built on top of [Playwright](https://playwright.dev). Instead of writing test scripts by hand, OpenCroc **reads your backend source code** (models, controllers, DTOs) and automatically generates complete E2E test suites — including API chains, seed data, request bodies, and assertions.
+OpenCroc is an **AI-native end-to-end testing framework** built on top of [Playwright](https://playwright.dev). Instead of writing test scripts by hand, OpenCroc **reads your backend source code** (models, controllers, DTOs) and automatically generates complete E2E test suites, including API chains, seed data, request bodies, and assertions.
 
-When tests fail, OpenCroc doesn't just report errors — it **traces the root cause** through the full request chain, **generates fix patches**, and **re-runs tests to verify the fix** — all autonomously.
+When tests fail, OpenCroc does not just report errors. It **traces the root cause** through the full request chain, **generates fix patches**, and **re-runs tests to verify the fix** autonomously.
 
 ### Key Capabilities
 
 | Capability | Description |
 |---|---|
 | **Source-Aware Test Generation** | Parses Sequelize/TypeORM models, Express/NestJS controllers, and DTO decorators via [ts-morph](https://ts-morph.com) to understand your API surface |
-| **AI-Driven Configuration** | LLM generates request body templates, seed data, parameter mappings — validated by 3-layer verification (schema → semantic → dry-run) |
+| **AI-Driven Configuration** | LLM generates request body templates, seed data, parameter mappings, validated by 3-layer verification (schema -> semantic -> dry-run) |
 | **Intelligent Chain Planning** | Builds API dependency DAGs, performs topological sorting, and plans test chains with greedy coverage optimization |
-| **Log-Driven Completion Detection** | Goes beyond `networkidle` — verifies request completion by matching backend execution logs (`api_exec end`) |
-| **Failure Chain Attribution** | Traces failures through the full call chain: network errors → slow APIs → backend logs → root cause |
-| **Controlled Self-Healing** | `backup → AI patch → dry-run → apply → re-run → verify → rollback` — with safety gates at every step |
-| **Impact Analysis** | BFS traversal of foreign key relations to map blast radius, auto-generates Mermaid diagrams |
+| **Log-Driven Completion Detection** | Goes beyond `networkidle`; verifies request completion by matching backend execution logs (`api_exec end`) |
+| **Failure Chain Attribution** | Traces failures through the full call chain: network errors -> slow APIs -> backend logs -> root cause |
+| **Controlled Self-Healing** | `backup -> AI patch -> dry-run -> apply -> re-run -> verify -> rollback`, with safety gates at every step |
+| **Impact Analysis** | BFS traversal of foreign key relations to map blast radius and auto-generate Mermaid diagrams |
 
 ## Quick Start
 
@@ -122,7 +122,7 @@ npx opencroc compare --baseline=report-a.json --current=report-b.json
 ### 6-Stage Pipeline
 
 ```
-Source Scan → ER Diagram → API Analysis → Chain Planning → Test Generation → Failure Analysis
+Source Scan -> ER Diagram -> API Analysis -> Chain Planning -> Test Generation -> Failure Analysis
      │            │             │              │                │                  │
   ts-morph    Mermaid      Dependency       Topological     Playwright +      Root Cause +
   parsing     erDiagram    DAG builder      + greedy        AI body/seed      Impact map
@@ -135,31 +135,31 @@ Source Scan → ER Diagram → API Analysis → Chain Planning → Test Generati
 OpenCroc uses [ts-morph](https://ts-morph.com) to statically analyze your backend:
 
 - **Models**: Extracts table names, column types, indexes, and foreign keys from Sequelize `Model.init()` / TypeORM `@Entity()`
-- **Controllers**: Extracts routes, HTTP methods, path parameters from Express `router.get/post/put/delete`
+- **Controllers**: Extracts routes, HTTP methods, and path parameters from Express `router.get/post/put/delete`
 - **DTOs**: Extracts validation rules from `@IsString()`, `@IsNumber()`, `@IsOptional()` decorators
 
 ### 2. AI Configuration Generation
 
 For each module, OpenCroc calls an LLM (OpenAI / ZhiPu / any OpenAI-compatible API) to generate:
 
-- **Request body templates** — field-accurate POST/PUT payloads
-- **Seed data** — `beforeAll` setup steps with correct API sequences
-- **Parameter mappings** — path parameter aliases (`/:id` → `categoryId`)
-- **ID aliases** — preventing ID conflicts across multi-resource chains
+- **Request body templates**: Field-accurate POST/PUT payloads
+- **Seed data**: `beforeAll` setup steps with correct API sequences
+- **Parameter mappings**: Path parameter aliases (`/:id` -> `categoryId`)
+- **ID aliases**: Preventing ID conflicts across multi-resource chains
 
 Each config is validated through **3 layers**:
-1. **Schema validation** — JSON structure completeness
-2. **Semantic validation** — field values match source code metadata
-3. **Dry-run validation** — TypeScript compilation check
+1. **Schema validation**: JSON structure completeness
+2. **Semantic validation**: Field values match source code metadata
+3. **Dry-run validation**: TypeScript compilation check
 
-Failed configs are **automatically fixed** (up to 3 rounds) before being written.
+Failed configs are automatically fixed (up to 3 rounds) before being written.
 
 ### 3. Log-Driven Completion
 
 Instead of relying on fragile `networkidle` signals:
 
 ```
-Frontend Request → Backend api_exec start log → Backend processing → api_exec end log
+Frontend Request -> Backend api_exec start log -> Backend processing -> api_exec end log
                                                                           ↓
                                               OpenCroc polls end logs to confirm completion
 ```
@@ -170,13 +170,13 @@ This catches cases where the frontend appears idle but the backend is still proc
 
 ```
 Test Failure
-  → AI Attribution (LLM + heuristic fallback)
-  → Generate Fix Patch
-  → Dry-Run Validation
-  → Apply Patch (with backup)
-  → Re-run Failed Tests
-  → Verify Fix
-  → Commit or Rollback
+  -> AI Attribution (LLM + heuristic fallback)
+  -> Generate Fix Patch
+  -> Dry-Run Validation
+  -> Apply Patch (with backup)
+  -> Re-run Failed Tests
+  -> Verify Fix
+  -> Commit or Rollback
 ```
 
 ## Configuration
@@ -249,7 +249,7 @@ export default defineConfig({
 | Failure chain attribution | ✅ | ❌ | Partial | ❌ |
 | Self-healing with rollback | ✅ | ❌ | ❌ | ❌ |
 | API dependency DAG | ✅ | ❌ | ❌ | ❌ |
-| Zero-config test generation | ✅ | Codegen only | Manual | NL→action |
+| Zero-config test generation | ✅ | Codegen only | Manual | NL->action |
 | Impact blast radius analysis | ✅ | ❌ | ❌ | ❌ |
 
 ## Roadmap
@@ -279,7 +279,7 @@ Visit **[opencroc.com](https://opencroc.com)** for full documentation, or browse
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
