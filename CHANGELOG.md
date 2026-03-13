@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-13
+
+### Added
+- **NestJS controller parser** in `src/parsers/controller-parser.ts`
+  - Supports `@Controller()` class prefix + method decorators (`@Get`, `@Post`, `@Put`, `@Delete`, `@Patch`)
+  - Supports `@RequestMapping({ method, path })` object syntax
+  - Handles object-style controller metadata (`@Controller({ path: '...' })`)
+  - Normalizes joined controller/method paths and extracts path params consistently
+- New unit tests in `src/parsers/controller-parser.test.ts` covering Express + NestJS scenarios
+
+### Changed
+- Roadmap updated in all README variants (EN/ZH/JA) to mark `NestJS controller parser` as completed
+- CLI version bumped to `0.4.0`
+
 ## [0.3.1] - 2026-03-13
 
 ### Fixed
@@ -215,7 +229,8 @@ See individual pre-release entries below for detailed changelogs.
 - GitHub Actions CI (`ci.yml`) with Node 20.x/22.x matrix
 - GitHub Actions release (`release.yml`) with tag-triggered npm publish
 
-[Unreleased]: https://github.com/opencroc/opencroc/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/opencroc/opencroc/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/opencroc/opencroc/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/opencroc/opencroc/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/opencroc/opencroc/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/opencroc/opencroc/compare/v0.2.0-rc.1...v0.2.0

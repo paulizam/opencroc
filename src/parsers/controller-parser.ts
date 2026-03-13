@@ -5,8 +5,11 @@ import {
   SyntaxKind,
   type CallExpression,
   type SourceFile,
-  type Node,
+  Node,
   type PropertyAccessExpression,
+  type Decorator,
+  type MethodDeclaration,
+  type ObjectLiteralExpression,
 } from 'ts-morph';
 import type { ApiEndpoint } from '../types.js';
 
@@ -20,6 +23,8 @@ const HTTP_METHODS = new Set(['get', 'post', 'put', 'delete', 'patch']);
 const METHOD_MAP: Record<string, string> = {
   get: 'GET', post: 'POST', put: 'PUT', delete: 'DELETE', patch: 'PATCH',
 };
+
+const NEST_HTTP_DECORATORS = new Set(['get', 'post', 'put', 'delete', 'patch']);
 
 /**
  * Parse a single Controller file and extract API endpoints.
@@ -35,6 +40,7 @@ export function parseControllerFile(filePath: string): ApiEndpoint[] {
     const endpoints: ApiEndpoint[] = [];
     endpoints.push(...extractRouterCalls(sourceFile));
     endpoints.push(...extractBaseCrudRoutes(sourceFile));
+    endpoints.push(...extractNestControllerRoutes(sourceFile));
 
     return deduplicateEndpoints(endpoints);
   } catch {
@@ -155,6 +161,58 @@ function extractBaseCrudRoutes(sourceFile: SourceFile): ApiEndpoint[] {
   return endpoints;
 }
 
+function extractNestControllerRoutes(sourceFile: SourceFile): ApiEndpoint[] {
+  const endpoints: ApiEndpoint[] = [];
+
+  for (const cls of sourceFile.getClasses()) {
+    const controllerDecorator = cls.getDecorators().find((d) => d.getName().toLowerCase() === 'controller');
+    if (!controllerDecorator) continue;
+
+    const controllerBasePath = normalizeRoutePath(extractDecoratorPath(controllerDecorator, sourceFile) ?? '');
+
+    for (const methodDecl of cls.getMethods()) {
+      const requestMapping = extractRequestMapping(methodDecl, sourceFile);
+      if (requestMapping) {
+        const fullPath = joinRoutePath(controllerBasePath, normalizeRoutePath(requestMapping.path));
+        endpoints.push({
+          method: requestMapping.method,
+          path: fullPath,
+          pathParams: extractPathParams(fullPath),
+          queryParams: [],
+          bodyFields: [],
+          responseFields: [],
+          relatedTables: [],
+          description: extractMethodDescription(methodDecl),
+        });
+        continue;
+      }
+
+      const httpDecorator = methodDecl.getDecorators().find((d) => NEST_HTTP_DECORATORS.has(d.getName().toLowerCase()));
+      if (!httpDecorator) continue;
+
+      const methodName = httpDecorator.getName().toLowerCase();
+      const method = METHOD_MAP[methodName];
+      if (!method) continue;
+
+      const methodPath = normalizeRoutePath(extractDecoratorPath(httpDecorator, sourceFile) ?? '');
+      const fullPath = joinRoutePath(controllerBasePath, methodPath);
+
+      endpoints.push({
+        method,
+        path: fullPath,
+        pathParams: extractPathParams(fullPath),
+        queryParams: [],
+        bodyFields: [],
+        responseFields: [],
+        relatedTables: [],
+        description: extractMethodDescription(methodDecl),
+      });
+    }
+  }
+
+  return endpoints;
+}
+
 /**
  * Infer related database table names from Service file imports.
  */
@@ -191,6 +249,78 @@ function resolveRoutePath(node: Node, sourceFile: SourceFile): string | null {
     return resolveVariableValue(sourceFile, node.getText().trim());
   }
   return null;
+}
+
+function extractDecoratorPath(decorator: Decorator, sourceFile: SourceFile): string | null {
+  const args = decorator.getArguments();
+  if (args.length === 0) return '';
+
+  const firstArg = args[0];
+  if (firstArg.getKind() === SyntaxKind.ObjectLiteralExpression) {
+    return extractPathFromObjectLiteral(firstArg as ObjectLiteralExpression, sourceFile);
+  }
+
+  return resolveRoutePath(firstArg, sourceFile);
+}
+
+function extractPathFromObjectLiteral(node: ObjectLiteralExpression, sourceFile: SourceFile): string | null {
+  const pathProp = node.getProperty('path');
+  if (!pathProp || !Node.isPropertyAssignment(pathProp)) return null;
+  const initializer = pathProp.getInitializer();
+  if (!initializer) return null;
+  return resolveRoutePath(initializer, sourceFile);
+}
+
+function extractRequestMapping(
+  methodDecl: MethodDeclaration,
+  sourceFile: SourceFile,
+): { method: string; path: string } | null {
+  const decorator = methodDecl.getDecorators().find((d) => d.getName().toLowerCase() === 'requestmapping');
+  if (!decorator) return null;
+
+  const args = decorator.getArguments();
+  if (args.length === 0) return null;
+  const firstArg = args[0];
+  if (firstArg.getKind() !== SyntaxKind.ObjectLiteralExpression) return null;
+
+  const obj = firstArg as ObjectLiteralExpression;
+  const methodProp = obj.getProperty('method');
+  let method = 'GET';
+  if (methodProp && Node.isPropertyAssignment(methodProp)) {
+    const init = methodProp.getInitializer();
+    const methodText = init?.getText() || '';
+    const normalized = methodText
+      .replace(/['"`]/g, '')
+      .split('.')
+      .pop()
+      ?.toUpperCase();
+    if (normalized && ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].includes(normalized)) {
+      method = normalized;
+    }
+  }
+
+  const pathValue = extractPathFromObjectLiteral(obj, sourceFile) ?? '';
+  return { method, path: pathValue };
+}
+
+function normalizeRoutePath(routePath: string): string {
+  const cleaned = routePath.trim();
+  if (!cleaned || cleaned === '/') return '';
+  return `/${cleaned.replace(/^\/+|\/+$/g, '')}`;
+}
+
+function joinRoutePath(basePath: string, childPath: string): string {
+  const joined = `${basePath}${childPath}`.replace(/\/+/g, '/');
+  return joined || '/';
+}
+
+function extractMethodDescription(methodDecl: MethodDeclaration): string {
+  const docs = methodDecl.getJsDocs();
+  if (docs.length > 0) {
+    const desc = docs[0].getDescription().trim();
+    if (desc) return desc;
+  }
+  return '';
 }
 
 function resolveTemplateLiteral(node: Node, sourceFile: SourceFile): string {

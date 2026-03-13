@@ -293,7 +293,7 @@ export default defineConfig({
 - [x] VS Code extension scaffold
 - [x] Plugin system
 - [x] HTML / JSON / Markdown report generation
-- [ ] NestJS controller parser
+- [x] NestJS controller parser
 - [ ] Visual dashboard (opencroc.com)
 - [ ] Drizzle ORM adapter
 
