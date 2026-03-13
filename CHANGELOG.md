@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0-alpha.1] - 2026-03-13
+
+### Added
+- **Sequelize adapter** (`src/adapters/sequelize.ts`) — wraps existing parsers as BackendAdapter
+- **TypeORM adapter** (`src/adapters/typeorm.ts`) — parses `@Entity`, `@Column`, `@PrimaryGeneratedColumn`, `@ManyToOne`/`@OneToMany`/`@OneToOne` decorators, `@JoinColumn` FK extraction
+- **Prisma adapter** (`src/adapters/prisma.ts`) — regex-based `.prisma` schema parser with `@@map`, `@relation`, `@id`, `@unique`, `@default` support
+- **Adapter registry** (`src/adapters/registry.ts`) — `createAdapter()`, `detectAdapter()` (auto-detect from project structure), `resolveAdapter()`
+- TypeORM fixture (`__fixtures__/typeorm-entities.ts`) and Prisma fixture (`__fixtures__/schema.prisma`)
+- 17 new unit tests across all adapters and registry (90 total)
+- Public exports: `createSequelizeAdapter`, `createTypeORMAdapter`, `createPrismaAdapter`, `createAdapter`, `detectAdapter`, `resolveAdapter`
+
+### Changed
+- `tsconfig.json` excludes `__fixtures__/` from type checking
+
 ## [0.1.10] - 2026-03-13
 
 ### Added

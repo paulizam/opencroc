@@ -56,3 +56,7 @@ export { createSelfHealingLoop, categorizeFailure } from './self-healing/index.j
 
 // --- Adapters ---
 export type { BackendAdapter, LlmProvider } from './adapters/types.js';
+export { createSequelizeAdapter } from './adapters/sequelize.js';
+export { createTypeORMAdapter } from './adapters/typeorm.js';
+export { createPrismaAdapter } from './adapters/prisma.js';
+export { createAdapter, detectAdapter, resolveAdapter } from './adapters/registry.js';
