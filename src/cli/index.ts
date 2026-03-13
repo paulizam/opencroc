@@ -7,7 +7,7 @@ const program = new Command();
 program
   .name('opencroc')
   .description('AI-native E2E testing framework')
-  .version('0.2.0-beta.1');
+  .version('0.2.0-rc.1');
 
 program
   .command('init')

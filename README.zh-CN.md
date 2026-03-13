@@ -180,6 +180,32 @@ Test Failure
   -> Commit or Rollback
 ```
 
+## 真实项目验证
+
+OpenCroc 已在一套**生产级 RBAC 系统**（多租户企业权限管理）上完成验证，涵盖 100+ Sequelize 模型、75+ Express 控制器、以及模型文件内嵌的关联声明：
+
+```
+$ npx tsx examples/rbac-system/smoke-test.ts
+
+Modules        : 5 (default, aigc, data-platform, integration, workflow)
+ER Diagrams    : 5
+  [default] 102 tables, 65 relations
+  [aigc] 6 tables, 0 relations
+  [data-platform] 4 tables, 0 relations
+  [integration] 14 tables, 0 relations
+  [workflow] 2 tables, 0 relations
+Chain Plans    : 5
+  [aigc] 78 chains, 150 steps
+Generated Files: 78
+Duration       : 1153ms
+```
+
+关键发现：
+- 从扁平模型布局中正确提取了 **102 张表** 和 **65 条外键关系**
+- 无需独立 association 文件，直接检测模型文件中的**嵌入式关联**（`.belongsTo()` / `.hasMany()`）
+- 5 个模块共生成 **78 个测试文件**，耗时仅 1 秒出头
+- 同时兼容扁平（`models/*.ts`）和嵌套（`models/module/*.ts`）目录结构
+
 ## 配置示例
 
 ```typescript
@@ -234,10 +260,10 @@ export default defineConfig({
 
 | 层级 | 已支持 | 规划中 |
 |---|---|---|
-| **ORM** | Sequelize | TypeORM, Prisma, Drizzle |
+| **ORM** | Sequelize, TypeORM, Prisma | Drizzle |
 | **Framework** | Express | NestJS, Fastify, Koa |
 | **Test Runner** | Playwright | — |
-| **LLM** | OpenAI, ZhiPu (GLM) | Anthropic, Ollama (local) |
+| **LLM** | OpenAI, ZhiPu (GLM), Ollama (local) | Anthropic |
 | **Database** | MySQL, PostgreSQL | SQLite, MongoDB |
 
 ## 对比
@@ -260,12 +286,14 @@ export default defineConfig({
 - [x] Controlled self-healing loop
 - [x] Log-driven completion detection
 - [x] Failure chain attribution + impact analysis
-- [ ] TypeORM / Prisma adapter
+- [x] TypeORM / Prisma adapter
+- [x] Ollama local LLM support
+- [x] Real-world validation (102 tables, 65 relations, 78 generated tests)
 - [ ] NestJS controller parser
 - [ ] Visual dashboard (opencroc.com)
 - [ ] GitHub Actions integration
 - [ ] VS Code extension
-- [ ] Ollama local LLM support
+- [ ] Plugin system
 
 ## 文档
 

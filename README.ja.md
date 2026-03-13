@@ -180,6 +180,32 @@ Test Failure
   -> Commit or Rollback
 ```
 
+## 実プロジェクト検証
+
+OpenCroc は**本番規模の RBAC システム**（マルチテナント企業権限管理）で検証済みです。100+ の Sequelize モデル、75+ の Express コントローラー、モデルファイル内埋め込みアソシエーションを含みます：
+
+```
+$ npx tsx examples/rbac-system/smoke-test.ts
+
+Modules        : 5 (default, aigc, data-platform, integration, workflow)
+ER Diagrams    : 5
+  [default] 102 tables, 65 relations
+  [aigc] 6 tables, 0 relations
+  [data-platform] 4 tables, 0 relations
+  [integration] 14 tables, 0 relations
+  [workflow] 2 tables, 0 relations
+Chain Plans    : 5
+  [aigc] 78 chains, 150 steps
+Generated Files: 78
+Duration       : 1153ms
+```
+
+主な結果：
+- フラットモデルレイアウトから **102 テーブル** と **65 の外部キー関係** を正確に抽出
+- 専用の association ファイル不要 — モデルファイル内の**埋め込みアソシエーション**（`.belongsTo()` / `.hasMany()`）を検出
+- 5 モジュールで **78 テストファイル** を約1秒で生成
+- フラット（`models/*.ts`）とネスト（`models/module/*.ts`）の両ディレクトリ構造に対応
+
 ## 設定例
 
 ```typescript
@@ -234,10 +260,10 @@ export default defineConfig({
 
 | レイヤー | 対応済み | 予定 |
 |---|---|---|
-| **ORM** | Sequelize | TypeORM, Prisma, Drizzle |
+| **ORM** | Sequelize, TypeORM, Prisma | Drizzle |
 | **Framework** | Express | NestJS, Fastify, Koa |
 | **Test Runner** | Playwright | — |
-| **LLM** | OpenAI, ZhiPu (GLM) | Anthropic, Ollama (local) |
+| **LLM** | OpenAI, ZhiPu (GLM), Ollama (local) | Anthropic |
 | **Database** | MySQL, PostgreSQL | SQLite, MongoDB |
 
 ## 比較
@@ -260,12 +286,14 @@ export default defineConfig({
 - [x] Controlled self-healing loop
 - [x] Log-driven completion detection
 - [x] Failure chain attribution + impact analysis
-- [ ] TypeORM / Prisma adapter
+- [x] TypeORM / Prisma adapter
+- [x] Ollama local LLM support
+- [x] Real-world validation (102 tables, 65 relations, 78 generated tests)
 - [ ] NestJS controller parser
 - [ ] Visual dashboard (opencroc.com)
 - [ ] GitHub Actions integration
 - [ ] VS Code extension
-- [ ] Ollama local LLM support
+- [ ] Plugin system
 
 ## ドキュメント
 

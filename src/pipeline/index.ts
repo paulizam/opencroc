@@ -53,12 +53,31 @@ export function createPipeline(config: OpenCrocConfig): Pipeline {
             result.modules.push(dir);
           }
 
-          // If no subdirectories, treat root as single module
+          // If no subdirectories, treat root as single "default" module
           if (result.modules.length === 0) {
             result.modules.push('default');
+          } else {
+            // Also include root-level model files as "default" module
+            const rootFiles = fs.readdirSync(modelsDir)
+              .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && f !== 'index.ts');
+            if (rootFiles.length > 0) {
+              result.modules.unshift('default');
+            }
           }
         }
       }
+
+      // Helper: resolve model dir for a module
+      const resolveModelDir = (backendRoot: string, mod: string): string =>
+        mod === 'default'
+          ? path.join(backendRoot, 'models')
+          : path.join(backendRoot, 'models', mod);
+
+      // Helper: resolve controller dir for a module
+      const resolveControllerDir = (backendRoot: string, mod: string): string =>
+        mod === 'default'
+          ? path.join(backendRoot, 'controllers')
+          : path.join(backendRoot, 'controllers', mod);
 
       // Step 2: ER Diagram — parse models and generate relationship graphs
       if (activeSteps.includes('er-diagram')) {
@@ -66,11 +85,31 @@ export function createPipeline(config: OpenCrocConfig): Pipeline {
         const backendRoot = path.resolve(config.backendRoot);
 
         for (const mod of result.modules) {
-          const modelDir = path.join(backendRoot, 'models', mod);
-          const assocFile = path.join(modelDir, 'associations.ts');
+          const modelDir = resolveModelDir(backendRoot, mod);
 
+          // For flat layouts, scan all model files for embedded associations
           const tables = fs.existsSync(modelDir) ? parseModuleModels(modelDir) : [];
-          const relations = fs.existsSync(assocFile) ? parseAssociationFile(assocFile) : [];
+          const relations: import('../types.js').ForeignKeyRelation[] = [];
+
+          // Check for dedicated associations.ts first
+          const assocFile = path.join(modelDir, 'associations.ts');
+          if (fs.existsSync(assocFile)) {
+            relations.push(...parseAssociationFile(assocFile));
+          }
+
+          // Also scan model files for embedded associations (belongsTo/hasMany at end of file)
+          if (fs.existsSync(modelDir)) {
+            const modelFiles = fs.readdirSync(modelDir)
+              .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && f !== 'index.ts' && f !== 'associations.ts');
+            for (const file of modelFiles) {
+              try {
+                const embedded = parseAssociationFile(path.join(modelDir, file));
+                relations.push(...embedded);
+              } catch {
+                // skip files that fail to parse
+              }
+            }
+          }
 
           const erResult: ERDiagramResult = erGen.generate(tables, relations);
           result.erDiagrams.set(mod, erResult);
@@ -83,7 +122,7 @@ export function createPipeline(config: OpenCrocConfig): Pipeline {
         const backendRoot = path.resolve(config.backendRoot);
 
         for (const mod of result.modules) {
-          const controllerDir = path.join(backendRoot, 'controllers', mod);
+          const controllerDir = resolveControllerDir(backendRoot, mod);
           const endpoints = fs.existsSync(controllerDir)
             ? parseControllerDirectory(controllerDir)
             : [];
@@ -110,7 +149,7 @@ export function createPipeline(config: OpenCrocConfig): Pipeline {
         const chainAnalyzer = createApiChainAnalyzer();
 
         for (const mod of result.modules) {
-          const controllerDir = path.join(backendRoot, 'controllers', mod);
+          const controllerDir = resolveControllerDir(backendRoot, mod);
           const endpoints = fs.existsSync(controllerDir)
             ? parseControllerDirectory(controllerDir)
             : [];

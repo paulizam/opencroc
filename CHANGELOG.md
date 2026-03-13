@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0-rc.1] - 2026-03-14
+
+### Added
+- **Real-world validation** on production-scale RBAC system (100+ models, 75+ controllers)
+  - 102 tables, 65 foreign key relations, 78 generated test files in ~1.2s
+  - Example config and smoke test at `examples/rbac-system/`
+- **Flat model layout support** — `resolveModelDir()` / `resolveControllerDir()` helpers for backends that place all models/controllers in a single directory instead of per-module subdirectories
+- **Embedded association scanning** — detects `.belongsTo()`, `.hasMany()`, `.hasOne()`, `.belongsToMany()` calls inside model files, no dedicated `associations.ts` required
+- **Root-level module inclusion** — pipeline now detects root-level `.ts` files in `models/` as "default" module alongside subdirectory-based modules
+- Updated all READMEs (EN, ZH, JA) with real-world validation results, updated tech stack tables, and refreshed roadmap
+
+### Changed
+- Pipeline Step 1 (scan): improved directory structure detection for flat vs nested layouts
+- Pipeline Step 2 (er-diagram): scans all model files for embedded associations
+- Pipeline Steps 3-4: use `resolveControllerDir()` for consistent path resolution
+- Tech stack tables updated: TypeORM, Prisma, Ollama moved to "Supported"
+- Roadmap updated with completed items
+
 ## [0.2.0-beta.1] - 2026-03-13
 
 ### Added
@@ -143,7 +161,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI (`ci.yml`) with Node 20.x/22.x matrix
 - GitHub Actions release (`release.yml`) with tag-triggered npm publish
 
-[Unreleased]: https://github.com/opencroc/opencroc/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/opencroc/opencroc/compare/v0.2.0-rc.1...HEAD
+[0.2.0-rc.1]: https://github.com/opencroc/opencroc/compare/v0.2.0-beta.1...v0.2.0-rc.1
+[0.2.0-beta.1]: https://github.com/opencroc/opencroc/compare/v0.2.0-alpha.1...v0.2.0-beta.1
+[0.2.0-alpha.1]: https://github.com/opencroc/opencroc/compare/v0.1.10...v0.2.0-alpha.1
+[0.1.10]: https://github.com/opencroc/opencroc/compare/v0.1.9...v0.1.10
+[0.1.9]: https://github.com/opencroc/opencroc/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/opencroc/opencroc/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/opencroc/opencroc/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/opencroc/opencroc/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/opencroc/opencroc/compare/v0.1.4...v0.1.5
