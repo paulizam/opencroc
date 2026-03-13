@@ -26,6 +26,9 @@ export type {
   ValidationError,
   SelfHealingResult,
   FixOutcome,
+  RuntimeConfig,
+  HookConfig,
+  ExecutionConfig,
 } from './types.js';
 
 // --- Config ---
@@ -87,3 +90,6 @@ export {
 
 // --- VSCode Extension Scaffold ---
 export { COMMANDS as VSCODE_COMMANDS, generateExtensionManifest, generateExtensionEntrypoint, buildModuleTree, buildStatusTree } from './vscode/index.js';
+
+// --- Runtime Infrastructure Generators ---
+export { generatePlaywrightConfig, generateGlobalSetup, generateGlobalTeardown, generateAuthSetup } from './runtime/index.js';

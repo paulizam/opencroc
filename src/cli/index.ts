@@ -7,7 +7,7 @@ const program = new Command();
 program
   .name('opencroc')
   .description('AI-native E2E testing framework')
-  .version('0.6.1');
+  .version('0.7.0');
 
 program
   .command('init')
@@ -91,6 +91,16 @@ program
   .action(async (opts) => {
     const { dashboard } = await import('./commands/dashboard.js');
     await dashboard(opts);
+  });
+
+program
+  .command('init-runtime')
+  .description('Generate Playwright runtime infrastructure (config, setup, teardown, auth)')
+  .option('-o, --output <dir>', 'Output directory for generated files', '.')
+  .option('--force', 'Overwrite existing files')
+  .action(async (opts) => {
+    const { initRuntime } = await import('./commands/init-runtime.js');
+    await initRuntime(opts);
   });
 
 program.parse();

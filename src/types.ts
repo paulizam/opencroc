@@ -28,6 +28,9 @@ export interface OpenCrocConfig {
   /** Test execution hooks (setup/auth/teardown) */
   execution?: ExecutionConfig;
 
+  /** Runtime infrastructure generation config */
+  runtime?: RuntimeConfig;
+
   /** Report configuration */
   report?: ReportConfig;
 }
@@ -49,6 +52,47 @@ export interface PlaywrightOverrides {
   baseURL?: string;
   headless?: boolean;
   timeout?: number;
+  /** Number of parallel workers (default: 2, CI: 4) */
+  workers?: number;
+  /** Retry count on failure (default: 0, CI: 1) */
+  retries?: number;
+  /** Action timeout in ms (default: 10000) */
+  actionTimeout?: number;
+  /** Navigation timeout in ms */
+  navigationTimeout?: number;
+}
+
+export interface RuntimeConfig {
+  /** Authentication strategy */
+  auth?: {
+    /** Login API URL for credential-based auth */
+    loginUrl?: string;
+    /** Credentials for automatic auth setup */
+    username?: string;
+    password?: string;
+    /** Storage state file path (default: playwright/.auth/user.json) */
+    storageStatePath?: string;
+  };
+  /** Database seed/cleanup configuration */
+  db?: {
+    /** Backend seed endpoint (e.g. /internal/e2e/seed) */
+    seedEndpoint?: string;
+    /** Backend cleanup endpoint (e.g. /internal/e2e/cleanup) */
+    cleanupEndpoint?: string;
+    /** SQL file to execute for seeding */
+    seedFile?: string;
+    /** SQL file to execute for cleanup */
+    cleanupFile?: string;
+  };
+  /** Test log management endpoint */
+  logEndpoint?: string;
+  /** Additional Playwright projects beyond the defaults */
+  extraProjects?: Array<{
+    name: string;
+    testMatch: string;
+    dependencies?: string[];
+    useAuth?: boolean;
+  }>;
 }
 
 export interface SelfHealingConfig {

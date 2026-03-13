@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-03-13
+
+### Added
+- **Playwright runtime infrastructure generators** (`src/runtime/`)
+  - `generatePlaywrightConfig()` — generates `playwright.config.ts` with multi-project setup (auth/no-auth), custom workers/retries, extra projects
+  - `generateGlobalSetup()` — generates `global-setup.ts` with backend readiness probe, seed endpoint, log cleanup
+  - `generateGlobalTeardown()` — generates `global-teardown.ts` with cleanup endpoint call
+  - `generateAuthSetup()` — generates `auth.setup.ts` with API-based or browser-based auth flow
+- **New CLI command**: `opencroc init-runtime` — generates all Playwright infrastructure files from config
+  - `--output <dir>` to control output location
+  - `--force` to overwrite existing files
+- **New types**: `RuntimeConfig` (auth, db seed/cleanup, log endpoint, extra projects), extended `PlaywrightOverrides` (workers, retries, actionTimeout, navigationTimeout)
+- **New exports**: `RuntimeConfig`, `HookConfig`, `ExecutionConfig` types; all four runtime generators
+- 20 new unit tests covering all runtime generators and the CLI command
+
 ## [0.6.1] - 2026-03-13
 
 ### Fixed
