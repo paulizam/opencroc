@@ -118,4 +118,15 @@ program
     await run(opts);
   });
 
+program
+  .command('serve')
+  .description('Start OpenCroc Studio — pixel croc office + knowledge graph UI')
+  .option('-p, --port <port>', 'Server port', '8765')
+  .option('-H, --host <host>', 'Server host', 'localhost')
+  .option('--no-open', 'Do not auto-open browser')
+  .action(async (opts) => {
+    const { serve } = await import('./commands/serve.js');
+    await serve(opts);
+  });
+
 program.parse();

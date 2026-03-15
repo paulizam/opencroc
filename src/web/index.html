@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenCroc Studio 🐊</title>
+<style>
+  :root {
+    --bg-dark: #0a0a1a;
+    --bg-panel: #12122a;
+    --bg-card: #1a1a3e;
+    --accent: #4ecca3;
+    --accent-dim: #2a8a6a;
+    --red: #e94560;
+    --orange: #f39c12;
+    --blue: #3498db;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --pixel-border: 2px solid #333;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-dark);
+    color: var(--text);
+    font-family: 'Courier New', 'Consolas', monospace;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ===== Layout ===== */
+  .app {
+    display: grid;
+    grid-template-rows: 48px 1fr 200px;
+    grid-template-columns: 240px 1fr;
+    height: 100vh;
+  }
+
+  .header {
+    grid-column: 1 / -1;
+    background: var(--bg-panel);
+    border-bottom: var(--pixel-border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+  }
+
+  .header h1 {
+    font-size: 16px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header .logo {
+    font-size: 24px;
+    image-rendering: pixelated;
+  }
+
+  .header .stats {
+    margin-left: auto;
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .header .stats span {
+    color: var(--accent);
+    font-weight: bold;
+  }
+
+  .header .conn-status {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background 0.3s;
+  }
+
+  .header .conn-status.connected { background: var(--accent); }
+
+  .sidebar {
+    background: var(--bg-panel);
+    border-right: var(--pixel-border);
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .sidebar h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 8px 4px 4px;
+    letter-spacing: 1px;
+  }
+
+  .sidebar .module-item {
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+  }
+
+  .sidebar .module-item:hover { background: var(--bg-card); }
+  .sidebar .module-item .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .sidebar .module-item .dot.idle { background: var(--text-dim); }
+  .sidebar .module-item .dot.testing { background: var(--orange); animation: blink 0.8s infinite; }
+  .sidebar .module-item .dot.passed { background: var(--accent); }
+  .sidebar .module-item .dot.failed { background: var(--red); }
+
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  /* ===== Main Canvas Area ===== */
+  .main {
+    position: relative;
+    overflow: hidden;
+  }
+
+  #graph-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* ===== Bottom Panel: Croc Office ===== */
+  .office-panel {
+    grid-column: 1 / -1;
+    background: var(--bg-panel);
+    border-top: var(--pixel-border);
+    display: flex;
+    overflow-x: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .croc-desk {
+    flex: 0 0 200px;
+    background: var(--bg-card);
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+  }
+
+  .croc-desk .croc-sprite {
+    font-size: 48px;
+    image-rendering: pixelated;
+    transition: transform 0.3s;
+    position: relative;
+  }
+
+  .croc-desk.working .croc-sprite {
+    animation: croc-work 0.6s infinite alternate;
+  }
+
+  .croc-desk.thinking .croc-sprite {
+    animation: croc-think 1s infinite;
+  }
+
+  @keyframes croc-work {
+    from { transform: translateY(0) rotate(-2deg); }
+    to { transform: translateY(-4px) rotate(2deg); }
+  }
+
+  @keyframes croc-think {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+
+  .croc-desk .croc-name {
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--accent);
+  }
+
+  .croc-desk .croc-role {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .croc-desk .croc-task {
+    font-size: 9px;
+    color: var(--orange);
+    text-align: center;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-height: 14px;
+  }
+
+  .croc-desk .status-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+
+  .croc-desk .status-badge.idle { background: var(--text-dim); }
+  .croc-desk .status-badge.working { background: var(--orange); animation: blink 0.6s infinite; }
+  .croc-desk .status-badge.thinking { background: var(--blue); animation: blink 1s infinite; }
+  .croc-desk .status-badge.done { background: var(--accent); }
+  .croc-desk .status-badge.error { background: var(--red); }
+
+  /* ===== Tooltip ===== */
+  .tooltip {
+    position: absolute;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-dim);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 11px;
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+    max-width: 300px;
+  }
+
+  .tooltip.visible { display: block; }
+
+  /* ===== Action Buttons ===== */
+  .actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn {
+    background: var(--accent-dim);
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn:hover { background: var(--accent); }
+  .btn.danger { background: #8b2035; }
+  .btn.danger:hover { background: var(--red); }
+
+  /* Pixel art decorations */
+  .pixel-floor {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: repeating-linear-gradient(90deg, #2a2a4a 0, #2a2a4a 8px, #1a1a3a 8px, #1a1a3a 16px);
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">🐊</div>
+    <h1>OpenCroc Studio</h1>
+    <div class="actions">
+      <button class="btn" id="btn-scan" title="Re-scan project">🔄 Scan</button>
+      <button class="btn" id="btn-test" title="Run all tests">▶ Test</button>
+    </div>
+    <div class="stats" id="header-stats">
+      <div>Modules: <span id="stat-modules">-</span></div>
+      <div>Models: <span id="stat-models">-</span></div>
+      <div>APIs: <span id="stat-endpoints">-</span></div>
+    </div>
+    <div class="conn-status" id="conn-status" title="WebSocket"></div>
+  </header>
+
+  <!-- Sidebar: Module List -->
+  <aside class="sidebar" id="sidebar">
+    <h3>🗂 Modules</h3>
+    <div id="module-list"></div>
+    <h3 style="margin-top:16px">🐊 Agents</h3>
+    <div id="agent-list-sidebar"></div>
+  </aside>
+
+  <!-- Main: Knowledge Graph Canvas -->
+  <main class="main">
+    <canvas id="graph-canvas"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+  </main>
+
+  <!-- Bottom: Pixel Croc Office -->
+  <section class="office-panel" id="croc-office">
+    <!-- Populated by JS -->
+  </section>
+</div>
+
+<script>
+// ============================================
+// OpenCroc Studio — M1 Frontend
+// ============================================
+
+const state = {
+  project: null,
+  graph: { nodes: [], edges: [] },
+  agents: [],
+  ws: null,
+  selectedNode: null,
+  // Canvas rendering state
+  pan: { x: 0, y: 0 },
+  zoom: 1,
+  dragging: false,
+  dragStart: { x: 0, y: 0 },
+  nodePositions: new Map(),
+  hoveredNode: null,
+};
+
+// ============ API ============
+
+async function fetchProject() {
+  try {
+    const res = await fetch('/api/project');
+    state.project = await res.json();
+    state.graph = state.project.graph || { nodes: [], edges: [] };
+    state.agents = state.project.agents || [];
+    layoutGraph();
+    updateUI();
+  } catch (e) {
+    console.error('Failed to fetch project:', e);
+  }
+}
+
+async function refreshProject() {
+  try {
+    await fetch('/api/project/refresh', { method: 'POST' });
+    await fetchProject();
+  } catch (e) {
+    console.error('Failed to refresh:', e);
+  }
+}
+
+// ============ WebSocket ============
+
+function connectWS() {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  state.ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+  state.ws.onopen = () => {
+    document.getElementById('conn-status').classList.add('connected');
+  };
+
+  state.ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'agent:update' && Array.isArray(msg.payload)) {
+        state.agents = msg.payload;
+        renderCrocOffice();
+        renderAgentSidebar();
+      } else if (msg.type === 'graph:update') {
+        state.graph = msg.payload;
+        layoutGraph();
+        renderCanvas();
+      }
+    } catch {}
+  };
+
+  state.ws.onclose = () => {
+    document.getElementById('conn-status').classList.remove('connected');
+    // Reconnect after 3s
+    setTimeout(connectWS, 3000);
+  };
+}
+
+// ============ Graph Layout (Force-directed) ============
+
+function layoutGraph() {
+  const nodes = state.graph.nodes;
+  if (!nodes.length) return;
+
+  const canvas = document.getElementById('graph-canvas');
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  // Group by module
+  const modules = new Map();
+  for (const node of nodes) {
+    const m = node.module || node.id;
+    if (!modules.has(m)) modules.set(m, []);
+    modules.get(m).push(node);
+  }
+
+  const moduleKeys = [...modules.keys()];
+  const moduleCount = moduleKeys.length || 1;
+
+  for (let mi = 0; mi < moduleKeys.length; mi++) {
+    const modNodes = modules.get(moduleKeys[mi]);
+    const angle = (mi / moduleCount) * Math.PI * 2 - Math.PI / 2;
+    const radius = Math.min(w, h) * 0.3;
+    const modCx = cx + Math.cos(angle) * radius;
+    const modCy = cy + Math.sin(angle) * radius;
+
+    for (let ni = 0; ni < modNodes.length; ni++) {
+      const nAngle = (ni / modNodes.length) * Math.PI * 2;
+      const nRadius = 40 + modNodes.length * 10;
+      state.nodePositions.set(modNodes[ni].id, {
+        x: modCx + Math.cos(nAngle) * nRadius,
+        y: modCy + Math.sin(nAngle) * nRadius,
+      });
+    }
+  }
+}
+
+// ============ Canvas Rendering ============
+
+function renderCanvas() {
+  const canvas = document.getElementById('graph-canvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate(state.pan.x, state.pan.y);
+  ctx.scale(state.zoom, state.zoom);
+
+  // Draw grid (pixel art style)
+  ctx.strokeStyle = '#1a1a3a';
+  ctx.lineWidth = 0.5;
+  const gridSize = 32;
+  for (let x = 0; x < w * 2; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, -h); ctx.lineTo(x, h * 2); ctx.stroke();
+  }
+  for (let y = 0; y < h * 2; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(-w, y); ctx.lineTo(w * 2, y); ctx.stroke();
+  }
+
+  const edges = state.graph.edges || [];
+  const nodes = state.graph.nodes || [];
+
+  // Draw edges
+  ctx.lineWidth = 1.5;
+  for (const edge of edges) {
+    const s = state.nodePositions.get(edge.source);
+    const t = state.nodePositions.get(edge.target);
+    if (!s || !t) continue;
+
+    const gradient = ctx.createLinearGradient(s.x, s.y, t.x, t.y);
+    gradient.addColorStop(0, 'rgba(78, 204, 163, 0.4)');
+    gradient.addColorStop(1, 'rgba(78, 204, 163, 0.1)');
+    ctx.strokeStyle = gradient;
+
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(t.x, t.y);
+    ctx.stroke();
+
+    // Arrow head
+    const angle = Math.atan2(t.y - s.y, t.x - s.x);
+    const arrowLen = 8;
+    const ax = t.x - Math.cos(angle) * 20;
+    const ay = t.y - Math.sin(angle) * 20;
+    ctx.fillStyle = 'rgba(78, 204, 163, 0.5)';
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - arrowLen * Math.cos(angle - 0.4), ay - arrowLen * Math.sin(angle - 0.4));
+    ctx.lineTo(ax - arrowLen * Math.cos(angle + 0.4), ay - arrowLen * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Draw nodes (pixel art style — square blocks)
+  const typeColors = {
+    model: '#4ecca3',
+    controller: '#e94560',
+    api: '#f39c12',
+    dto: '#3498db',
+    module: '#9b59b6',
+  };
+
+  const statusOutline = {
+    idle: '#555',
+    testing: '#f39c12',
+    passed: '#4ecca3',
+    failed: '#e94560',
+  };
+
+  for (const node of nodes) {
+    const pos = state.nodePositions.get(node.id);
+    if (!pos) continue;
+
+    const size = node.type === 'module' ? 24 : 16;
+    const color = typeColors[node.type] || '#888';
+    const outline = statusOutline[node.status] || '#555';
+    const isHovered = state.hoveredNode === node.id;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(pos.x - size + 2, pos.y - size + 2, size * 2, size * 2);
+
+    // Main block
+    ctx.fillStyle = color;
+    ctx.fillRect(pos.x - size, pos.y - size, size * 2, size * 2);
+
+    // Pixel highlight (top-left)
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(pos.x - size, pos.y - size, size * 2, 3);
+    ctx.fillRect(pos.x - size, pos.y - size, 3, size * 2);
+
+    // Status outline
+    ctx.strokeStyle = isHovered ? '#fff' : outline;
+    ctx.lineWidth = isHovered ? 3 : 2;
+    ctx.strokeRect(pos.x - size, pos.y - size, size * 2, size * 2);
+
+    // Icon (pixel emoji)
+    ctx.font = `${size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const icons = { model: '📦', controller: '🎮', api: '🔌', dto: '📋', module: '📁' };
+    ctx.fillText(icons[node.type] || '⬜', pos.x, pos.y);
+
+    // Label
+    ctx.font = '10px "Courier New"';
+    ctx.fillStyle = isHovered ? '#fff' : '#ccc';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const label = node.label || node.id.split(':').pop();
+    ctx.fillText(label, pos.x, pos.y + size + 4);
+  }
+
+  ctx.restore();
+}
+
+// ============ Canvas Interaction ============
+
+function setupCanvasInteraction() {
+  const canvas = document.getElementById('graph-canvas');
+
+  canvas.addEventListener('mousedown', (e) => {
+    state.dragging = true;
+    state.dragStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (state.dragging) {
+      state.pan.x = e.clientX - state.dragStart.x;
+      state.pan.y = e.clientY - state.dragStart.y;
+      renderCanvas();
+    }
+
+    // Hit-test nodes
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left - state.pan.x) / state.zoom;
+    const my = (e.clientY - rect.top - state.pan.y) / state.zoom;
+
+    let hit = null;
+    for (const node of state.graph.nodes) {
+      const pos = state.nodePositions.get(node.id);
+      if (!pos) continue;
+      const size = node.type === 'module' ? 24 : 16;
+      if (mx >= pos.x - size && mx <= pos.x + size && my >= pos.y - size && my <= pos.y + size) {
+        hit = node;
+        break;
+      }
+    }
+
+    const tooltip = document.getElementById('tooltip');
+    if (hit) {
+      state.hoveredNode = hit.id;
+      tooltip.innerHTML = `<b>${hit.label || hit.id}</b><br>Type: ${hit.type}<br>Status: ${hit.status}${hit.module ? '<br>Module: ' + hit.module : ''}`;
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top = (e.clientY + 12) + 'px';
+      tooltip.classList.add('visible');
+      canvas.style.cursor = 'pointer';
+    } else {
+      if (state.hoveredNode) {
+        state.hoveredNode = null;
+        renderCanvas();
+      }
+      tooltip.classList.remove('visible');
+      canvas.style.cursor = state.dragging ? 'grabbing' : 'grab';
+    }
+    if (hit) renderCanvas();
+  });
+
+  canvas.addEventListener('mouseup', () => { state.dragging = false; });
+  canvas.addEventListener('mouseleave', () => {
+    state.dragging = false;
+    document.getElementById('tooltip').classList.remove('visible');
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    state.zoom = Math.max(0.2, Math.min(3, state.zoom * delta));
+    renderCanvas();
+  }, { passive: false });
+}
+
+// ============ UI Updates ============
+
+function updateUI() {
+  if (state.project) {
+    document.getElementById('stat-modules').textContent = state.project.stats?.modules || 0;
+    document.getElementById('stat-models').textContent = state.project.stats?.models || 0;
+    document.getElementById('stat-endpoints').textContent = state.project.stats?.endpoints || 0;
+  }
+
+  renderModuleList();
+  renderCrocOffice();
+  renderAgentSidebar();
+  renderCanvas();
+}
+
+function renderModuleList() {
+  const list = document.getElementById('module-list');
+  const modules = state.graph.nodes.filter(n => n.type === 'module');
+
+  if (!modules.length) {
+    list.innerHTML = '<div style="padding:8px;color:#666;font-size:11px">No modules found</div>';
+    return;
+  }
+
+  list.innerHTML = modules.map(m => `
+    <div class="module-item" data-id="${esc(m.id)}">
+      <div class="dot ${m.status}"></div>
+      ${esc(m.label || m.id.replace('module:', ''))}
+    </div>
+  `).join('');
+}
+
+function renderAgentSidebar() {
+  const list = document.getElementById('agent-list-sidebar');
+  list.innerHTML = state.agents.map(a => `
+    <div class="module-item">
+      <div class="dot ${a.status}"></div>
+      ${esc(a.name)} <span style="color:#666;font-size:9px">${a.status}</span>
+    </div>
+  `).join('');
+}
+
+function renderCrocOffice() {
+  const office = document.getElementById('croc-office');
+
+  const sprites = {
+    parser: '🐊',
+    analyzer: '🐊',
+    tester: '🐊',
+    healer: '🐊',
+    planner: '🐊',
+    reporter: '🐊',
+  };
+
+  // Desk decorations per role
+  const deskDecor = {
+    parser: '💻',
+    analyzer: '📊',
+    tester: '🧪',
+    healer: '🔧',
+    planner: '📋',
+    reporter: '📝',
+  };
+
+  office.innerHTML = state.agents.map(a => `
+    <div class="croc-desk ${a.status}">
+      <div class="status-badge ${a.status}"></div>
+      <div class="croc-sprite">${sprites[a.role] || '🐊'}</div>
+      <div class="croc-name">${esc(a.name)}</div>
+      <div class="croc-role">${esc(a.role)} ${deskDecor[a.role] || ''}</div>
+      <div class="croc-task">${a.currentTask ? esc(a.currentTask) : ''}</div>
+      <div class="pixel-floor"></div>
+    </div>
+  `).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============ Event Handlers ============
+
+document.getElementById('btn-scan').addEventListener('click', refreshProject);
+document.getElementById('btn-test').addEventListener('click', async () => {
+  // M2: will trigger real test pipeline
+  try {
+    await fetch('/api/agents/tester-croc/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: 'Running E2E tests...' }),
+    });
+  } catch (e) {
+    console.error('Failed to start test:', e);
+  }
+});
+
+// ============ Init ============
+
+(async () => {
+  setupCanvasInteraction();
+  await fetchProject();
+  connectWS();
+
+  // Handle resize
+  window.addEventListener('resize', () => {
+    layoutGraph();
+    renderCanvas();
+  });
+})();
+</script>
+</body>
+</html>
