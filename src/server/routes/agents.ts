@@ -51,4 +51,43 @@ export function registerAgentRoutes(app: FastifyInstance, office: CrocOffice): v
       agents: office.getAgents(),
     };
   });
+
+  // GET /api/files — generated test files from last pipeline run
+  app.get('/api/files', async () => {
+    const files = office.getGeneratedFiles();
+    return files.map(f => ({
+      filePath: f.filePath,
+      module: f.module,
+      chain: f.chain,
+      lines: f.content.split('\n').length,
+      size: f.content.length,
+    }));
+  });
+
+  // GET /api/files/:index — get content of a specific generated file
+  app.get<{ Params: { index: string } }>('/api/files/:index', async (req, reply) => {
+    const files = office.getGeneratedFiles();
+    const idx = parseInt(req.params.index, 10);
+    if (isNaN(idx) || idx < 0 || idx >= files.length) {
+      reply.code(404).send({ error: 'File not found' });
+      return;
+    }
+    return files[idx];
+  });
+
+  // GET /api/pipeline/result — last pipeline result summary
+  app.get('/api/pipeline/result', async () => {
+    const result = office.getLastPipelineResult();
+    if (!result) return { ok: false, message: 'No pipeline has been run yet' };
+    return {
+      ok: true,
+      modules: result.modules,
+      erDiagramCount: result.erDiagrams.size,
+      chainCount: [...result.chainPlans.values()].reduce((s, p) => s + p.chains.length, 0),
+      totalSteps: [...result.chainPlans.values()].reduce((s, p) => s + p.totalSteps, 0),
+      filesGenerated: result.generatedFiles.length,
+      validationErrors: result.validationErrors.length,
+      duration: result.duration,
+    };
+  });
 }

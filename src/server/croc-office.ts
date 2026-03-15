@@ -1,5 +1,5 @@
 import type { WebSocket } from 'ws';
-import type { OpenCrocConfig } from '../types.js';
+import type { OpenCrocConfig, PipelineRunResult, GeneratedTestFile } from '../types.js';
 
 export interface CrocAgent {
   id: string;
@@ -70,6 +70,8 @@ export class CrocOffice {
   private agents: CrocAgent[];
   private cachedGraph: KnowledgeGraph | null = null;
   private running = false;
+  private lastPipelineResult: PipelineRunResult | null = null;
+  private lastGeneratedFiles: GeneratedTestFile[] = [];
 
   constructor(config: OpenCrocConfig, cwd: string) {
     this.config = config;
@@ -156,52 +158,113 @@ export class CrocOffice {
     }
   }
 
-  /** Run the pipeline: scan → er-diagram → api-chain → plan → codegen */
+  /** Run the real pipeline: scan → er-diagram → api-chain → plan → codegen → report */
   async runPipeline(): Promise<TaskResult> {
     if (this.running) return { ok: false, task: 'pipeline', duration: 0, error: 'Another task is running' };
     this.running = true;
     const start = Date.now();
 
     try {
-      // Phase 1: Scan
+      const { resolve: resolvePath } = await import('node:path');
+      const { createPipeline } = await import('../pipeline/index.js');
+
+      const backendRoot = resolvePath(this.cwd, this.config.backendRoot);
+      const pipelineConfig = { ...this.config, backendRoot };
+      const pipeline = createPipeline(pipelineConfig);
+
+      // Phase 1: Scan + ER Diagram (解析鳄)
       this.updateAgent('parser-croc', { status: 'working', currentTask: 'Scanning source code...', progress: 10 });
       this.log('🐊 解析鳄 is scanning source code...');
       this.invalidateCache();
       await this.buildKnowledgeGraph();
       this.updateNodeStatus('module', 'testing');
 
-      // Phase 2: Analyze
-      this.updateAgent('parser-croc', { status: 'done', currentTask: 'Scan complete', progress: 100 });
+      // Run real pipeline: scan + er-diagram
+      this.updateAgent('parser-croc', { currentTask: 'Parsing models & ER diagrams...', progress: 40 });
+      const scanResult = await pipeline.run(['scan', 'er-diagram']);
+      const moduleCount = scanResult.modules.length;
+      const erCount = scanResult.erDiagrams.size;
+      this.log(`📊 Found ${moduleCount} modules, ${erCount} ER diagrams`);
+      this.updateAgent('parser-croc', { status: 'done', currentTask: `${moduleCount} modules parsed`, progress: 100 });
+
+      // Phase 2: API Chain Analysis (分析鳄)
       this.updateAgent('analyzer-croc', { status: 'working', currentTask: 'Analyzing API chains...', progress: 0 });
       this.log('🐊 分析鳄 is analyzing API dependencies...');
-      await this.delay(800); // Allow UI to update
+      const analyzeResult = await pipeline.run(['api-chain']);
+      const warnings = analyzeResult.validationErrors.filter(e => e.severity === 'warning');
+      if (warnings.length > 0) {
+        this.log(`⚠️ ${warnings.length} API chain warnings`, 'warn');
+      }
       this.updateAgent('analyzer-croc', { status: 'done', currentTask: 'Analysis complete', progress: 100 });
 
-      // Phase 3: Plan
+      // Phase 3: Plan test chains (规划鳄)
       this.updateAgent('planner-croc', { status: 'thinking', currentTask: 'Planning test chains...', progress: 0 });
       this.log('🐊 规划鳄 is planning test chains...');
-      await this.delay(600);
-      this.updateAgent('planner-croc', { status: 'done', currentTask: 'Plan ready', progress: 100 });
+      const planResult = await pipeline.run(['plan']);
+      let totalChains = 0, totalSteps = 0;
+      for (const [, plan] of planResult.chainPlans) {
+        totalChains += plan.chains.length;
+        totalSteps += plan.totalSteps;
+      }
+      this.log(`📋 Planned ${totalChains} test chains with ${totalSteps} steps`);
+      this.updateAgent('planner-croc', { status: 'done', currentTask: `${totalChains} chains planned`, progress: 100 });
 
-      // Phase 4: Generate
+      // Phase 4: Generate test code (测试鳄)
       this.updateAgent('tester-croc', { status: 'working', currentTask: 'Generating test code...', progress: 0 });
-      this.log('🐊 测试鳄 is generating test code...');
+      this.log('🐊 测试鳄 is generating Playwright test code...');
       this.updateNodeStatus('controller', 'testing');
-      await this.delay(500);
-      this.updateNodeStatus('controller', 'passed');
-      this.updateAgent('tester-croc', { status: 'done', currentTask: 'Tests generated', progress: 100 });
 
-      // Phase 5: Report
-      this.updateAgent('reporter-croc', { status: 'working', currentTask: 'Building report...', progress: 0 });
+      // Full pipeline run for codegen (it needs prior steps' results internally)
+      const fullResult = await pipeline.run(['scan', 'er-diagram', 'api-chain', 'plan', 'codegen']);
+      this.lastPipelineResult = fullResult;
+      this.lastGeneratedFiles = fullResult.generatedFiles;
+
+      // Write generated files to disk
+      const { writeFileSync, mkdirSync } = await import('node:fs');
+      const { dirname } = await import('node:path');
+      let filesWritten = 0;
+      for (const file of fullResult.generatedFiles) {
+        const fullPath = resolvePath(this.cwd, file.filePath);
+        mkdirSync(dirname(fullPath), { recursive: true });
+        writeFileSync(fullPath, file.content, 'utf-8');
+        filesWritten++;
+      }
+
+      this.updateNodeStatus('controller', 'passed');
+      this.log(`✅ Generated ${filesWritten} test files`);
+      this.updateAgent('tester-croc', { status: 'done', currentTask: `${filesWritten} files generated`, progress: 100 });
+
+      // Broadcast generated files to frontend
+      this.broadcast('files:generated', fullResult.generatedFiles.map(f => ({
+        filePath: f.filePath,
+        module: f.module,
+        chain: f.chain,
+        lines: f.content.split('\n').length,
+      })));
+
+      // Phase 5: Report (汇报鳄)
+      this.updateAgent('reporter-croc', { status: 'working', currentTask: 'Compiling report...', progress: 0 });
       this.log('🐊 汇报鳄 is compiling results...');
-      await this.delay(400);
+
+      // Validation
+      const validateResult = await pipeline.run(['validate']);
+      const errors = validateResult.validationErrors.filter(e => e.severity === 'error');
+      if (errors.length > 0) {
+        this.log(`⚠️ ${errors.length} validation errors`, 'warn');
+      }
+
       this.updateNodeStatus('module', 'passed');
       this.updateAgent('reporter-croc', { status: 'done', currentTask: 'Report ready', progress: 100 });
 
       const duration = Date.now() - start;
-      this.log(`✅ Pipeline complete in ${duration}ms`);
-      this.broadcast('pipeline:complete', { duration, status: 'success' });
-      return { ok: true, task: 'pipeline', duration };
+      this.log(`✅ Pipeline complete in ${duration}ms — ${moduleCount} modules, ${totalChains} chains, ${filesWritten} files`);
+      this.broadcast('pipeline:complete', {
+        duration, status: 'success',
+        summary: { modules: moduleCount, chains: totalChains, steps: totalSteps, files: filesWritten },
+      });
+      return { ok: true, task: 'pipeline', duration, details: {
+        modules: moduleCount, chains: totalChains, steps: totalSteps, files: filesWritten,
+      }};
     } catch (err) {
       this.updateAgent('tester-croc', { status: 'error', currentTask: String(err) });
       this.log(`❌ Pipeline failed: ${err}`, 'error');
@@ -222,6 +285,16 @@ export class CrocOffice {
     this.broadcast('agent:update', this.agents);
   }
 
+  /** Get last pipeline result */
+  getLastPipelineResult(): PipelineRunResult | null {
+    return this.lastPipelineResult;
+  }
+
+  /** Get generated test files from last pipeline run */
+  getGeneratedFiles(): GeneratedTestFile[] {
+    return this.lastGeneratedFiles;
+  }
+
   // ============ Graph Helpers ============
 
   private updateNodeStatus(type: KnowledgeGraphNode['type'], status: KnowledgeGraphNode['status']): void {
@@ -232,10 +305,6 @@ export class CrocOffice {
       }
     }
     this.broadcast('graph:update', this.cachedGraph);
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /** Build knowledge graph from project source code */

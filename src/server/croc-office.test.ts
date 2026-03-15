@@ -91,4 +91,25 @@ describe('CrocOffice', () => {
     expect(office.getConfig()).toBe(config);
     expect(office.getCwd()).toBe(process.cwd());
   });
+
+  it('should return empty generated files initially', () => {
+    const office = new CrocOffice(config, process.cwd());
+    expect(office.getGeneratedFiles()).toEqual([]);
+  });
+
+  it('should return null pipeline result initially', () => {
+    const office = new CrocOffice(config, process.cwd());
+    expect(office.getLastPipelineResult()).toBeNull();
+  });
+
+  it('should run pipeline with real code generation', async () => {
+    const office = new CrocOffice(config, process.cwd());
+    const result = await office.runPipeline();
+    expect(result.ok).toBe(true);
+    expect(result.task).toBe('pipeline');
+    expect(result.duration).toBeGreaterThanOrEqual(0);
+    expect(office.isRunning()).toBe(false);
+    // Pipeline result should be stored
+    expect(office.getLastPipelineResult()).not.toBeNull();
+  });
 });

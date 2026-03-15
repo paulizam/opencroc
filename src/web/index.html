@@ -57,7 +57,21 @@
   .tooltip.visible { display:block; }
 
   .log-panel { background:var(--bg-panel); border-left:var(--pixel-border); display:flex; flex-direction:column; overflow:hidden; }
-  .log-panel h3 { font-size:10px; text-transform:uppercase; color:var(--text-dim); padding:10px 10px 6px; letter-spacing:1px; border-bottom:1px solid #222; }
+  .panel-tabs { display:flex; border-bottom:1px solid #222; }
+  .panel-tabs .tab { background:none; border:none; color:var(--text-dim); font-family:inherit; font-size:10px; padding:8px 12px; cursor:pointer; text-transform:uppercase; letter-spacing:1px; border-bottom:2px solid transparent; }
+  .panel-tabs .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .panel-tabs .tab:hover { color:var(--text); }
+  .file-list { flex:1; overflow-y:auto; padding:4px 8px; font-size:10px; }
+  .file-item { padding:6px 8px; border-bottom:1px solid #1a1a2e; cursor:pointer; border-radius:3px; }
+  .file-item:hover { background:var(--bg-card); }
+  .file-item .fname { color:var(--accent); font-weight:bold; }
+  .file-item .fmeta { color:var(--text-dim); font-size:9px; margin-top:2px; }
+  .file-preview { position:fixed; top:60px; left:50%; transform:translateX(-50%); width:700px; max-height:80vh; background:var(--bg-panel); border:2px solid var(--accent-dim); border-radius:8px; z-index:200; display:none; flex-direction:column; }
+  .file-preview.visible { display:flex; }
+  .file-preview .fp-header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid #333; }
+  .file-preview .fp-header h4 { font-size:12px; color:var(--accent); margin:0; }
+  .file-preview .fp-close { background:none; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; }
+  .file-preview pre { flex:1; overflow:auto; padding:12px; margin:0; font-size:11px; line-height:1.5; color:var(--text); background:#0d0d20; }
   .log-list { flex:1; overflow-y:auto; padding:4px 8px; font-size:10px; line-height:1.6; }
   .log-list .log-entry { padding:2px 0; border-bottom:1px solid #1a1a2e; word-break:break-all; }
   .log-list .log-entry.warn { color:var(--orange); }
@@ -99,6 +113,7 @@
       <div>Modules: <span id="s-mod">-</span></div>
       <div>Models: <span id="s-mdl">-</span></div>
       <div>APIs: <span id="s-api">-</span></div>
+      <div>Tests: <span id="s-files">-</span></div>
     </div>
     <div class="conn-dot" id="conn-dot" title="WebSocket"></div>
   </header>
@@ -116,18 +131,28 @@
   </main>
 
   <div class="log-panel">
-    <h3>📋 Activity Log</h3>
+    <div class="panel-tabs">
+      <button class="tab active" data-tab="log">📋 Log</button>
+      <button class="tab" data-tab="files">📄 Tests <span id="file-badge" style="display:none;background:var(--accent);color:#000;border-radius:8px;padding:0 5px;font-size:9px;margin-left:3px">0</span></button>
+    </div>
     <div class="log-list" id="log-list"></div>
+    <div class="file-list" id="file-list" style="display:none"></div>
   </div>
 
   <section class="office" id="croc-office"></section>
+</div>
+
+<div class="file-preview" id="file-preview">
+  <div class="fp-header"><h4 id="fp-title">file.spec.ts</h4><button class="fp-close" id="fp-close">&times;</button></div>
+  <pre id="fp-code"></pre>
 </div>
 
 <script>
 const S = {
   project:null, graph:{nodes:[],edges:[]}, agents:[], ws:null,
   pan:{x:0,y:0}, zoom:1, dragging:false, dragStart:{x:0,y:0},
-  nodePos:new Map(), hoveredNode:null, running:false, _userPanned:false
+  nodePos:new Map(), hoveredNode:null, running:false, _userPanned:false,
+  generatedFiles:[]
 };
 
 async function fetchProject(){
@@ -171,6 +196,12 @@ function connectWS(){
         S.graph=m.payload; layoutGraph(); renderCanvas(); renderModList(); updateStats();
       }else if(m.type==='log'){
         addLog(m.payload.message, m.payload.level);
+      }else if(m.type==='files:generated'){
+        S.generatedFiles=m.payload||[];
+        renderFileList();
+        document.getElementById('s-files').textContent=S.generatedFiles.length;
+        const badge=document.getElementById('file-badge');
+        badge.textContent=S.generatedFiles.length;badge.style.display='inline';
       }else if(m.type==='pipeline:complete'){
         S.running=false; updateBtns();
         if(m.payload.status==='success') addLog('✅ Pipeline complete!');
@@ -437,6 +468,46 @@ function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 document.getElementById('btn-scan').addEventListener('click',doScan);
 document.getElementById('btn-pipeline').addEventListener('click',doPipeline);
 document.getElementById('btn-reset').addEventListener('click',doReset);
+
+// Tab switching
+document.querySelectorAll('.panel-tabs .tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.panel-tabs .tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const t=tab.getAttribute('data-tab');
+    document.getElementById('log-list').style.display=t==='log'?'':'none';
+    document.getElementById('file-list').style.display=t==='files'?'':'none';
+  });
+});
+
+// File list rendering
+function renderFileList(){
+  const el=document.getElementById('file-list');
+  if(!S.generatedFiles.length){el.innerHTML='<div style="padding:12px;color:#555;font-size:10px">No test files generated yet. Run Pipeline first.</div>';return;}
+  el.innerHTML=S.generatedFiles.map((f,i)=>
+    '<div class="file-item" data-idx="'+i+'"><div class="fname">'+esc(f.filePath.split('/').pop()||f.filePath)+'</div>'+
+    '<div class="fmeta">'+esc(f.module)+' / '+esc(f.chain)+' — '+f.lines+' lines</div></div>'
+  ).join('');
+  el.querySelectorAll('.file-item').forEach(item=>{
+    item.addEventListener('click',async()=>{
+      const idx=item.getAttribute('data-idx');
+      try{
+        const r=await fetch('/api/files/'+idx); const file=await r.json();
+        document.getElementById('fp-title').textContent=file.filePath;
+        document.getElementById('fp-code').textContent=file.content;
+        document.getElementById('file-preview').classList.add('visible');
+      }catch(e){addLog('Failed to load file: '+e.message,'error');}
+    });
+  });
+}
+
+// File preview close
+document.getElementById('fp-close').addEventListener('click',()=>{
+  document.getElementById('file-preview').classList.remove('visible');
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') document.getElementById('file-preview').classList.remove('visible');
+});
 
 (async()=>{setupCanvas();await fetchProject();connectWS();addLog('🐊 OpenCroc Studio ready');
 window.addEventListener('resize',()=>{layoutGraph();renderCanvas();});})();
