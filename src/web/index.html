@@ -34,6 +34,7 @@
   .btn:disabled { opacity:.4; cursor:not-allowed; transform:none; }
   .btn.danger { background:#8b2035; }
   .btn.danger:hover { background:var(--red); }
+  .mode-select { background:var(--bg-card); color:var(--text); border:1px solid #333; border-radius:3px; font-family:inherit; font-size:10px; padding:4px 6px; }
   .header .stats { margin-left:auto; display:flex; gap:14px; font-size:11px; color:var(--text-dim); }
   .header .stats span { color:var(--accent); font-weight:bold; }
   .conn-dot { width:8px; height:8px; border-radius:50%; background:var(--red); transition:background .3s; }
@@ -107,6 +108,11 @@
     <div class="actions">
       <button class="btn" id="btn-scan" title="Scan project">🔍 Scan</button>
       <button class="btn" id="btn-pipeline" title="Run full pipeline">▶ Pipeline</button>
+      <select id="run-mode" class="mode-select" title="Test run mode">
+        <option value="auto">Auto</option>
+        <option value="reuse">Reuse</option>
+        <option value="managed">Managed</option>
+      </select>
       <button class="btn" id="btn-run-tests" title="Run generated tests" disabled>🧪 Run Tests</button>
       <button class="btn" id="btn-reports" title="Generate reports" disabled>📊 Reports</button>
       <button class="btn danger" id="btn-reset" title="Reset agents">⏹ Reset</button>
@@ -159,7 +165,7 @@ const S = {
   project:null, graph:{nodes:[],edges:[]}, agents:[], ws:null,
   pan:{x:0,y:0}, zoom:1, dragging:false, dragStart:{x:0,y:0},
   nodePos:new Map(), hoveredNode:null, running:false, _userPanned:false,
-  generatedFiles:[], testMetrics:null, reports:[]
+  generatedFiles:[], testMetrics:null, testQuality:null, reports:[], runMode:'auto'
 };
 
 async function fetchProject(){
@@ -187,8 +193,18 @@ async function doReset(){
 }
 async function doRunTests(){
   if(S.running)return; S.running=true; updateBtns();
-  addLog('🧪 Starting test execution...');
-  try{await fetch('/api/run-tests',{method:'POST'});}
+  addLog('🧪 Starting test execution ('+S.runMode+')...');
+  try{
+    const r=await fetch('/api/run-tests',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({mode:S.runMode}),
+    });
+    if(!r.ok){
+      const body=await r.json().catch(()=>({error:'unknown error'}));
+      throw new Error(body.error||('HTTP '+r.status));
+    }
+  }
   catch(e){addLog('Run tests failed: '+e.message,'error');S.running=false;updateBtns();}
 }
 async function doReports(){
@@ -200,6 +216,7 @@ async function doReports(){
 function updateBtns(){
   document.getElementById('btn-scan').disabled=S.running;
   document.getElementById('btn-pipeline').disabled=S.running;
+  document.getElementById('run-mode').disabled=S.running||S.generatedFiles.length===0;
   document.getElementById('btn-run-tests').disabled=S.running||S.generatedFiles.length===0;
   document.getElementById('btn-reports').disabled=S.running||S.generatedFiles.length===0;
 }
@@ -229,14 +246,19 @@ function connectWS(){
         else addLog('❌ Pipeline failed: '+(m.payload.error||''),'error');
         setTimeout(fetchProject,500);
       }else if(m.type==='test:complete'){
-        S.running=false; S.testMetrics=m.payload.metrics; updateBtns(); renderResults();
+        S.running=false; S.testMetrics=m.payload.metrics||null; S.testQuality=m.payload.quality||null; updateBtns(); renderResults();
         const met=m.payload.metrics;
         document.getElementById('s-results-wrap').style.display='';
-        document.getElementById('s-results').textContent=met.passed+'✓ '+met.failed+'✗';
-        document.getElementById('s-results').style.color=met.failed>0?'var(--red)':'var(--accent)';
+        if(met){
+          document.getElementById('s-results').textContent=met.passed+'✓ '+met.failed+'✗';
+          document.getElementById('s-results').style.color=met.failed>0?'var(--red)':'var(--accent)';
+        }else{
+          document.getElementById('s-results').textContent='setup fail';
+          document.getElementById('s-results').style.color='var(--red)';
+        }
         const rb=document.getElementById('result-badge');
         rb.textContent=m.payload.total||0; rb.style.display='inline';
-        rb.style.background=met.failed>0?'var(--red)':'var(--accent)';
+        rb.style.background=(met&&met.failed>0)?'var(--red)':'var(--accent)';
       }else if(m.type==='reports:generated'){
         S.running=false; S.reports=m.payload||[]; updateBtns(); renderReports();
         addLog('📊 '+S.reports.length+' reports generated');
@@ -503,6 +525,7 @@ document.getElementById('btn-pipeline').addEventListener('click',doPipeline);
 document.getElementById('btn-reset').addEventListener('click',doReset);
 document.getElementById('btn-run-tests').addEventListener('click',doRunTests);
 document.getElementById('btn-reports').addEventListener('click',doReports);
+document.getElementById('run-mode').addEventListener('change',e=>{S.runMode=e.target.value;});
 
 // Tab switching
 document.querySelectorAll('.panel-tabs .tab').forEach(tab=>{
@@ -549,10 +572,37 @@ document.addEventListener('keydown',e=>{
 // Test Results rendering
 function renderResults(){
   const el=document.getElementById('results-panel');
-  if(!S.testMetrics){el.innerHTML='<div style="padding:12px;color:#555;font-size:10px">No test results yet. Run Tests first.</div>';return;}
+  if(!S.testMetrics&&!S.testQuality){el.innerHTML='<div style="padding:12px;color:#555;font-size:10px">No test results yet. Run Tests first.</div>';return;}
+  const q=S.testQuality;
+  if(!S.testMetrics&&q){
+    el.innerHTML='<div style="padding:10px">'
+      +'<div style="font-size:13px;font-weight:bold;margin-bottom:8px">🧪 Test Execution Results</div>'
+      +'<div style="padding:10px;border-radius:4px;background:#2d0a12;color:var(--red);font-size:10px;margin-bottom:10px">Setup failed before test execution.</div>'
+      +'<div style="font-size:11px;margin-bottom:6px">Gate Level: <span style="color:'+(q.level==='fail'?'var(--red)':q.level==='warn'?'var(--orange)':'var(--accent)')+';font-weight:bold">'+q.level.toUpperCase()+'</span></div>'
+      +'<div style="font-size:10px;color:var(--text-dim)">Auth: '+q.authStatus+' | Backend: '+q.backendStatus+'</div>'
+      +'<div style="font-size:10px;color:var(--text-dim);margin-top:4px">Reasons: '+(q.reasons&&q.reasons.length?q.reasons.join(', '):'-')+'</div>'
+      +'</div>';
+    return;
+  }
   const m=S.testMetrics, total=m.passed+m.failed+m.skipped+m.timedOut;
   const passRate=total>0?Math.round(m.passed/total*100):0;
   const barColor=m.failed>0?'var(--red)':'var(--accent)';
+  let qualityHtml='';
+  if(q){
+    const gateColor=q.level==='fail'?'var(--red)':q.level==='warn'?'var(--orange)':'var(--accent)';
+    qualityHtml='<div style="margin-top:12px;padding-top:10px;border-top:1px solid #2a2a45">'
+      +'<div style="font-size:12px;font-weight:bold;margin-bottom:8px">🧭 Execution Quality</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px">'
+      +'<div style="background:#1a1a2e;padding:6px;border-radius:4px">Gate: <span style="color:'+gateColor+';font-weight:bold">'+q.level.toUpperCase()+'</span></div>'
+      +'<div style="background:#1a1a2e;padding:6px;border-radius:4px">Setup Fail: '+q.setupFail+'</div>'
+      +'<div style="background:#1a1a2e;padding:6px;border-radius:4px">Skip Ratio: '+Math.round((q.skipRatio||0)*100)+'%</div>'
+      +'<div style="background:#1a1a2e;padding:6px;border-radius:4px">Auth Fail Ratio: '+Math.round((q.authFailRatio||0)*100)+'%</div>'
+      +'<div style="background:#1a1a2e;padding:6px;border-radius:4px">Effective Rate: '+Math.round((q.effectiveExecutionRate||0)*100)+'%</div>'
+      +'<div style="background:#1a1a2e;padding:6px;border-radius:4px">Auth/Backend: '+q.authStatus+' / '+q.backendStatus+'</div>'
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--text-dim);margin-top:6px">Reasons: '+(q.reasons&&q.reasons.length?q.reasons.join(', '):'-')+'</div>'
+      +'</div>';
+  }
   el.innerHTML='<div style="padding:10px">'
     +'<div style="font-size:13px;font-weight:bold;margin-bottom:8px">🧪 Test Execution Results</div>'
     +'<div style="display:flex;gap:12px;margin-bottom:10px">'
@@ -564,6 +614,7 @@ function renderResults(){
     +'<div style="background:#222;border-radius:3px;height:8px;overflow:hidden">'
     +'<div style="height:100%;width:'+passRate+'%;background:'+barColor+';transition:width .5s"></div></div>'
     +'<div style="text-align:center;font-size:10px;color:var(--text-dim);margin-top:4px">Pass Rate: '+passRate+'% ('+total+' total)</div>'
+    +qualityHtml
     +'</div>';
 }
 

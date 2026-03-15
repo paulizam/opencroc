@@ -448,6 +448,7 @@ export class CrocOffice {
     } catch (err) {
       this.updateAgent('tester-croc', { status: 'error', currentTask: String(err) });
       this.log(`❌ Test execution failed: ${err}`, 'error');
+      this.broadcast('test:complete', { metrics: null, total: 0, quality: this.lastExecutionQuality });
       return { ok: false, task: 'execute', duration: Date.now() - start, error: String(err) };
     } finally {
       if (cleanupBackend) {
