@@ -127,7 +127,7 @@
 const S = {
   project:null, graph:{nodes:[],edges:[]}, agents:[], ws:null,
   pan:{x:0,y:0}, zoom:1, dragging:false, dragStart:{x:0,y:0},
-  nodePos:new Map(), hoveredNode:null, running:false
+  nodePos:new Map(), hoveredNode:null, running:false, _userPanned:false
 };
 
 async function fetchProject(){
@@ -198,18 +198,42 @@ function updateStats(){
 function layoutGraph(){
   const nodes=S.graph.nodes; if(!nodes.length)return;
   const c=document.getElementById('graph-canvas');
-  const w=c.clientWidth||800,h=c.clientHeight||500,cx=w/2,cy=h/2;
+  const w=c.clientWidth||800,h=c.clientHeight||500;
+  // Group nodes by module
   const mods=new Map();
-  for(const n of nodes){const m=n.module||n.id;if(!mods.has(m))mods.set(m,[]);mods.get(m).push(n);}
-  const keys=[...mods.keys()];
+  for(const n of nodes){
+    const m=n.module||'_none';
+    if(n.type==='module'){S.nodePos.set(n.id,{x:0,y:0});continue;}
+    if(!mods.has(m))mods.set(m,[]);mods.get(m).push(n);
+  }
+  const keys=[...mods.keys()]; const nMods=keys.length||1;
+  // Calculate total canvas size needed — scale with node count
+  const totalNodes=nodes.length;
+  const canvasScale=Math.max(1, Math.sqrt(totalNodes/50));
+  const baseRadius=Math.min(w,h)*0.35*canvasScale;
+  // Place modules around a circle, each module's members in a sub-ring
   for(let i=0;i<keys.length;i++){
-    const mn=mods.get(keys[i]);
-    const a=(i/keys.length)*Math.PI*2-Math.PI/2, r=Math.min(w,h)*.3;
-    const mcx=cx+Math.cos(a)*r, mcy=cy+Math.sin(a)*r;
+    const mn=mods.get(keys[i]); if(!mn)continue;
+    const modAngle=(i/nMods)*Math.PI*2-Math.PI/2;
+    const mcx=w/2+Math.cos(modAngle)*baseRadius;
+    const mcy=h/2+Math.sin(modAngle)*baseRadius;
+    // Place module node at group center
+    const modNodeId='module:'+keys[i];
+    S.nodePos.set(modNodeId,{x:mcx,y:mcy});
+    // Sub-ring radius scales with member count, min 60
+    const subRadius=Math.max(60, Math.sqrt(mn.length)*28);
     for(let j=0;j<mn.length;j++){
-      const na=(j/mn.length)*Math.PI*2, nr=35+mn.length*8;
-      S.nodePos.set(mn[j].id,{x:mcx+Math.cos(na)*nr,y:mcy+Math.sin(na)*nr});
+      const na=(j/mn.length)*Math.PI*2;
+      S.nodePos.set(mn[j].id,{x:mcx+Math.cos(na)*subRadius,y:mcy+Math.sin(na)*subRadius});
     }
+  }
+  // Auto-center: reset pan to center of all nodes
+  if(totalNodes>0&&!S._userPanned){
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for(const[,p] of S.nodePos){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
+    const gw=maxX-minX+200,gh=maxY-minY+200,gcx=minX+(maxX-minX)/2,gcy=minY+(maxY-minY)/2;
+    S.zoom=Math.min(1, Math.min(w/gw, h/gh));
+    S.pan.x=w/2-gcx*S.zoom;S.pan.y=h/2-gcy*S.zoom;
   }
 }
 
@@ -225,8 +249,10 @@ function renderCanvas(){
   for(let x=0;x<w*2;x+=32){ctx.beginPath();ctx.moveTo(x,-h);ctx.lineTo(x,h*2);ctx.stroke();}
   for(let y=0;y<h*2;y+=32){ctx.beginPath();ctx.moveTo(-w,y);ctx.lineTo(w*2,y);ctx.stroke();}
   const edges=S.graph.edges||[],nodes=S.graph.nodes||[];
-  // Edges
+  const largeGraph=nodes.length>100;
+  // Edges — for large graphs, only draw 'uses' relations (skip 'contains' to reduce clutter)
   for(const e of edges){
+    if(largeGraph && e.relation==='contains') continue;
     const s=S.nodePos.get(e.source),t=S.nodePos.get(e.target);if(!s||!t)continue;
     ctx.strokeStyle='rgba(78,204,163,.25)';ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(t.x,t.y);ctx.stroke();
@@ -249,15 +275,17 @@ function renderCanvas(){
     ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(p.x-sz,p.y-sz,sz*2,3);ctx.fillRect(p.x-sz,p.y-sz,3,sz*2);
     ctx.shadowBlur=0;ctx.strokeStyle=hov?'#fff':ol;ctx.lineWidth=hov?3:2;ctx.strokeRect(p.x-sz,p.y-sz,sz*2,sz*2);
     ctx.font=sz+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(icons[n.type]||'⬜',p.x,p.y);
-    ctx.font='10px "Courier New"';ctx.fillStyle=hov?'#fff':'#bbb';ctx.textAlign='center';ctx.textBaseline='top';
-    ctx.fillText((n.label||n.id.split(':').pop()).substring(0,20),p.x,p.y+sz+4);
+    if(!largeGraph||S.zoom>0.5||n.type==='module'||hov){
+      ctx.font='10px "Courier New"';ctx.fillStyle=hov?'#fff':'#bbb';ctx.textAlign='center';ctx.textBaseline='top';
+      ctx.fillText((n.label||n.id.split(':').pop()).substring(0,20),p.x,p.y+sz+4);
+    }
   }
   ctx.restore();
 }
 
 function setupCanvas(){
   const c=document.getElementById('graph-canvas');
-  c.addEventListener('mousedown',e=>{S.dragging=true;S.dragStart={x:e.clientX-S.pan.x,y:e.clientY-S.pan.y};c.style.cursor='grabbing';});
+  c.addEventListener('mousedown',e=>{S.dragging=true;S._userPanned=true;S.dragStart={x:e.clientX-S.pan.x,y:e.clientY-S.pan.y};c.style.cursor='grabbing';});
   c.addEventListener('mousemove',e=>{
     if(S.dragging){S.pan.x=e.clientX-S.dragStart.x;S.pan.y=e.clientY-S.dragStart.y;renderCanvas();}
     const rect=c.getBoundingClientRect(),mx=(e.clientX-rect.left-S.pan.x)/S.zoom,my=(e.clientY-rect.top-S.pan.y)/S.zoom;

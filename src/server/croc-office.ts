@@ -253,16 +253,53 @@ export class CrocOffice {
       const edges: KnowledgeGraphEdge[] = [];
       const moduleSet = new Set<string>();
 
+      // Helper: infer module from file path
+      // 1) If file is in a subfolder under models/ or controllers/ (e.g. models/aigc/Foo.ts → "aigc")
+      // 2) Otherwise, use filename prefix via camelCase split (e.g. appPermissionController → "app")
+      const inferModule = (filePath: string, type: 'model' | 'controller'): string => {
+        const parts = filePath.replace(/\\/g, '/').split('/');
+        // Find the type directory (models or controllers)
+        const typeDir = type === 'model' ? 'models' : 'controllers';
+        const typeDirIdx = parts.indexOf(typeDir);
+        if (typeDirIdx >= 0 && parts.length - typeDirIdx > 2) {
+          // File is in a subfolder: models/aigc/Foo.ts → "aigc"
+          return parts[typeDirIdx + 1];
+        }
+        // Infer from filename prefix: DataModel.ts → "data", appPermission.ts → "app"
+        const baseName = parts[parts.length - 1].replace(/\.(ts|js)$/, '').replace(/Controller$/, '');
+        const prefixMatch = baseName.match(/^([a-z]+)/i);
+        if (prefixMatch) {
+          const prefix = prefixMatch[1].toLowerCase();
+          // Merge very short prefixes into broader groups
+          const groupMap: Record<string, string> = {
+            app: 'app', api: 'api', data: 'data', auth: 'auth',
+            user: 'user', role: 'role', menu: 'menu', dept: 'org',
+            department: 'org', org: 'org', chain: 'workflow',
+            workflow: 'workflow', batch: 'batch', column: 'data',
+            computed: 'data', designer: 'designer', monitor: 'monitor',
+            notification: 'notification', permission: 'permission',
+            template: 'template', validation: 'validation',
+            field: 'field', delegation: 'workflow', import: 'import-export',
+            export: 'import-export', dictionary: 'data', panorama: 'panorama',
+            inference: 'inference', simulation: 'simulation', er: 'data',
+            relation: 'data', recycle: 'data', statistics: 'statistics',
+            operation: 'log', log: 'log', timeout: 'workflow',
+          };
+          return groupMap[prefix] || prefix;
+        }
+        return 'other';
+      };
+
       // Scan for models
       this.updateAgent('parser-croc', { progress: 40, currentTask: 'Scanning models...' });
       const modelFiles = await glob('**/models/**/*.{ts,js}', {
         cwd: backendRoot,
-        ignore: ['**/node_modules/**', '**/*.test.*', '**/*.spec.*', '**/index.*'],
+        ignore: ['**/node_modules/**', '**/*.test.*', '**/*.spec.*', '**/index.*', '**/dist/**'],
       });
 
       for (const file of modelFiles) {
-        const parts = file.split('/');
-        const moduleName = parts.length >= 3 ? parts[parts.length - 3] : 'default';
+        const parts = file.replace(/\\/g, '/').split('/');
+        const moduleName = inferModule(file, 'model');
         const fileName = parts[parts.length - 1].replace(/\.(ts|js)$/, '');
         const nodeId = `model:${fileName}`;
 
@@ -280,13 +317,13 @@ export class CrocOffice {
       this.updateAgent('parser-croc', { progress: 70, currentTask: 'Scanning controllers...' });
       const controllerFiles = await glob('**/controllers/**/*.{ts,js}', {
         cwd: backendRoot,
-        ignore: ['**/node_modules/**', '**/*.test.*', '**/*.spec.*', '**/index.*'],
+        ignore: ['**/node_modules/**', '**/*.test.*', '**/*.spec.*', '**/index.*', '**/dist/**'],
       });
 
       for (const file of controllerFiles) {
-        const parts = file.split('/');
-        const moduleName = parts.length >= 3 ? parts[parts.length - 3] : 'default';
-        const fileName = parts[parts.length - 1].replace(/\.(ts|js)$/, '').replace('.controller', '');
+        const parts = file.replace(/\\/g, '/').split('/');
+        const moduleName = inferModule(file, 'controller');
+        const fileName = parts[parts.length - 1].replace(/\.(ts|js)$/, '').replace(/Controller$/, '');
         const nodeId = `controller:${fileName}`;
 
         moduleSet.add(moduleName);
@@ -298,8 +335,9 @@ export class CrocOffice {
           module: moduleName,
         });
 
-        // Link controller to its model
-        const modelNode = nodes.find((n) => n.type === 'model' && n.label.toLowerCase() === fileName.toLowerCase());
+        // Link controller to its model with fuzzy match
+        const lcName = fileName.toLowerCase();
+        const modelNode = nodes.find((n) => n.type === 'model' && n.label.toLowerCase() === lcName);
         if (modelNode) {
           edges.push({ source: nodeId, target: modelNode.id, relation: 'uses' });
         }
